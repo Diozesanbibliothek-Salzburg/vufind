@@ -1,0 +1,7 @@
+httpd-vufind.conf
+config/vufind/Alma.ini
+config/vufind/config.ini
+config/vufind/permissions.ini
+import/import_auth.properties
+import/import.properties
+import/index_java/bin/

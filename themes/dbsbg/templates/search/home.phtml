@@ -1,0 +1,34 @@
+<?php
+  // Set page title.
+  $this->headTitle($this->translate('Search Home'));
+
+  // Disable top search box -- this page has a special layout.
+  $this->layout()->searchbox = false;
+
+  // Set default value if necessary:
+  if (!isset($this->searchClassId)) {
+    $this->searchClassId = 'Solr';
+  }
+
+  $this->layout()->breadcrumbs = false;
+?>
+
+<div class="searchHomeContent">
+  <?php $this->slot('search-home-hero')->start() ?>
+    <?php
+    /*
+    <?=$this->context($this)->renderInContext("search/searchbox.phtml", ['ignoreHiddenFilterMemory' => true])?>
+    <?=$this->inlineScript(\Laminas\View\Helper\HeadScript::SCRIPT, '$("#searchForm_lookfor").focus();', 'SET'); ?>
+    */
+    ?>
+    <div class="dbSbgSearchboxBackground"> <!-- DbSbg: Red background bar for search form - only on start page before first search (for others: see header.phtml)! -->
+    <div class="container"> <!-- DbSbg: For keeping margins despite whole-width background bar - only on start page before first search (for others: see header.phtml)! -->
+      <?=$this->context($this)->renderInContext("search/searchbox.phtml", ['ignoreHiddenFilterMemory' => true])?>
+      <?=$this->inlineScript(\Laminas\View\Helper\HeadScript::SCRIPT, '$("#searchForm_lookfor").focus();', 'SET'); ?>
+    </div>
+  </div>
+
+  <?=$this->slot('search-home-hero')->end() ?>
+</div>
+
+<?=implode('', array_map([$this, 'contentBlock'], $blocks ?? []))?>

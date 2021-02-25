@@ -1,0 +1,125 @@
+body {
+  font-family: Arial, sans-serif
+}
+
+.navbar-brand {
+  height: auto; // Making space for Logo
+  padding-left: 0; // Align logo with search field
+  width: 170px;
+}
+
+// Remove dotted line around link on logo
+.navbar-brand, .navbar-brand:focus, .navbar-brand:active {
+  outline: none;
+}
+
+// Colored backgroud for search box
+.dbSbgSearchboxBackground {
+  // Background color
+  background: none repeat scroll 0 0 #0358d6;
+
+  // Padding top and bottom of red bar
+  padding: 8px 0 8px 0;
+
+  // 100% viewport width
+  width: 100vw;
+  
+  // Fix left margin:
+  margin-left: -50vw;
+  left: 50%;
+  position: relative;
+
+  // Fix left margin in one line - maybe not supported by all Browsers
+  //margin-left: calc(~"50% - 50vw");
+}
+
+#searchForm {
+  // Stretching the whole form with the searchbox in the red bar
+  width: 100%;
+}
+
+
+// Styling search button
+#searchForm .btn-primary {
+  background-color: white;
+  text-decoration: none;
+  color: #333;
+}
+
+// White texts in search bar
+.searchForm .btn-link, .active-filters .filters .filters-term, .active-filters .filters .filters-title, .adv_search_links, .adv_search_links a {
+  background-color: none;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+  outline: none;
+}
+
+// Base layout for gray/red buttons
+.btn:not(.btn-link), .reset-filters-btn {
+	font-weight: bold;
+	color: #fff;
+	background-color: #333;
+	border-color: #e0e0e0;
+}
+
+// Hover, focus and active layout for gray/red buttons
+.btn:not(.btn-link):hover, .btn:not(.btn-link):focus, .btn:not(.btn-link):active {
+	color: #fff;
+	outline: none;
+}
+
+// "Reset filter" button in the search bar. The dark-gray background color
+// of our buttons is used (see general .btn style above). This is the hover,
+// focuse and acitve style. No visible changes will be seen on this actions.
+.reset-filters-btn, .reset-filters-btn:hover, .reset-filters-btn:active, .reset-filters-btn:focus {
+  background-color: #333;
+  color: #fff;
+  text-decoration: none;
+  outline: none;
+}
+
+// "Active filter" indicators in search bar. We use the dark-gray background color
+// of our buttons for them.
+.active-filters .filters .filter-value {
+	background: #333;
+}
+
+// Style for the "remove" X for "active filter" indicators in the search bar
+// This has the effect that there is no visible change on hover, focus and active.
+.active-filters .search-filter-remove,
+.active-filters .search-filter-remove:hover,
+.active-filters .search-filter-remove:focus,
+.active-filters .search-filter-remove:active {
+    color: #fff;
+    text-decoration: none;
+    outline: none;
+}
+
+@media (min-width:768px) {
+  .container {
+      // Overall width
+      width: 85%;
+      
+  }
+
+  .dbSbgSearchboxBackground #searchForm_lookfor {
+      // Stretching the searchbox
+      width: 40%;
+  }
+
+}
+
+@media (min-width:992px) {
+  .container {
+      // Overall width
+      width: 85%;
+  }
+}
+
+@media (min-width:1200px) {
+  .container {
+      // Overall width
+      width: 85%;
+  }
+}
