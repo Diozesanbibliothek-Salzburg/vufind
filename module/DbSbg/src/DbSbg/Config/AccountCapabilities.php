@@ -55,4 +55,17 @@ class AccountCapabilities extends \VuFind\Config\AccountCapabilities
             ? 'disabled' : 'enabled';
     }
 
+    /**
+     * Get "E-Mail this search" setting ('enabled' or 'disabled').
+     *
+     * @return string
+     */
+    public function getEmailThisSearchSetting()
+    {
+        return isset($this->config->Social->emailThisSearch)
+            && $this->config->Social->emailThisSearch === 'disabled'
+            ? 'disabled' : 'enabled';
+    }
+
+
 }
