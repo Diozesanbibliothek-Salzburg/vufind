@@ -14,6 +14,7 @@
       <li role="none"><a class="sms-record toolbar-btn btn-type-phone" data-lightbox href="<?=$this->recordLink()->getActionUrl($this->driver, 'SMS')?>" rel="nofollow"><?=$this->transEsc('Text this')?></a></li>
     <?php endif; ?>
 
+    <?php /* DbSbg: Check if the button to "E-Mail this record" should be displayed or not */ ?>
     <?php if ($this->accountCapabilities()->getEmailThisRecordSetting() !== 'disabled'): ?>
       <li role="none"><a class="mail-record toolbar-btn btn-type-email" data-lightbox href="<?=$this->recordLink()->getActionUrl($this->driver, 'Email')?>" rel="nofollow"><?=$this->transEsc('Email this')?></a></li>
     <?php endif; ?>
