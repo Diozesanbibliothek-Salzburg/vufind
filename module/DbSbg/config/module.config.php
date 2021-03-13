@@ -10,6 +10,14 @@ $config = [
         'VuFind\Controller\BrowseController' => 'DbSbg\Controller\BrowseController'
     ]
   ],
+  'service_manager' => [
+    'factories' => [
+      'DbSbg\Config\AccountCapabilities' => 'VuFind\Config\AccountCapabilitiesFactory'
+    ],
+    'aliases' => [
+      'VuFind\Config\AccountCapabilities' => 'DbSbg\Config\AccountCapabilities'
+    ]
+  ],
   'vufind' => [
     'plugin_managers' => [
       'recorddriver' => [
