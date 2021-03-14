@@ -38,35 +38,43 @@ namespace DbSbg\RecordDriver;
  */
 trait MarcCustomTrait
 {
-    /**
-     * Get the full title of the record.
-     *
-     * @return string
-     */
-    /*
-    public function getTitle()
-    {
-        return $this->getFirstFieldValue('245', ['a', 'b']);
-    }
-    */
 
     /**
      * DbSbg: Get the whole title of the record. This is the main title, subtitle and
-     *        title sections, separated by colon.
+     *        title parts, all separated by colon.
      *
      * @return string The whole title with it's parts separated by colon
      */
     public function getTitle() {
-      $titleMain = $this->getFirstFieldValue('245', ['a', 'b']);
+      $titleMain = $this->getFirstFieldValue('245', ['a']);
       $titleSub = trim($this->getSubtitle());
-      $titleSec = trim($this->getTitleSection());
+      $titlePartNumber = trim($this->getTitlePartNumber());
+      $titlePartName = trim($this->getTitlePartName());
       return implode(
           ' : ',
           array_filter(
-              [$titleMain, $titleSub, $titleSec],
+              [$titleMain, $titleSub, $titlePartNumber, $titlePartName],
               array($this, 'filterCallback')
           )
       );
+    }
+
+    /**
+     * DbSbg: Get name of part of a work
+     *
+     * @return void
+     */
+    public function getTitlePartName() {
+        return $this->getFirstFieldValue('245', ['p']);
+    }
+
+    /**
+     * DbSbg: Get number of part of a work
+     *
+     * @return void
+     */
+    public function getTitlePartNumber() {
+      return $this->getFirstFieldValue('245', ['n']);
     }
 
     /**
