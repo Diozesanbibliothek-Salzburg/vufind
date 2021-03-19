@@ -208,6 +208,7 @@ Subject:
     - genre^50
     - era
     # DbSbg:
+    - subjectChainTopic_txt_mv^100
     - autSubjects_txt_mv^70
     - autGeographics_txt_mv^70
   DismaxHandler: edismax
@@ -307,6 +308,7 @@ AllFields:
     - autPersons_txt_mv^250
     - autCorporations_txt_mv^250
     - autMeetings_txt_mv^200
+    - subjectChainTopic_txt_mv^450
     - autSubjects_txt_mv^450
     - autGeographics_txt_mv^400
     - id
