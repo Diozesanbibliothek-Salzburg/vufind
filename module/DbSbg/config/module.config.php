@@ -32,8 +32,13 @@ $config = [
           'DbSbg\RecordDriver\SolrMarc' => [
               'VuFind\RecordDriver\IlsAwareDelegatorFactory'
           ]
-      ]
+        ]
       ],
+      'search_backend' => [
+          'factories' => [
+              'Solr' => 'DbSbg\Search\Factory\SolrDefaultBackendFactory'
+          ]
+      ]
     ]
   ]
 ];
