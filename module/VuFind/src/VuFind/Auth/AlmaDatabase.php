@@ -21,7 +21,7 @@
  *
  * @category VuFind
  * @package  Authentication
- * @author   Michael Birkner <michael.birkner@akwien.at>
+ * @author   Michael Birkner <birkner_michael@yahoo.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
@@ -35,7 +35,7 @@ use VuFind\Exception\Auth as AuthException;
  *
  * @category VuFind
  * @package  Authentication
- * @author   Michael Birkner <michael.birkner@akwien.at>
+ * @author   Michael Birkner <birkner_michael@yahoo.de>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
