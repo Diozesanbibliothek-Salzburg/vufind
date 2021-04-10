@@ -25,10 +25,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development
  */
-namespace DbSbg;
-
-use Laminas\ModuleManager\ModuleManager;
-use Laminas\Mvc\MvcEvent;
+namespace DbSbgTheme;
 
 /**
  * Template for code module for storing local overrides.
@@ -41,16 +38,6 @@ use Laminas\Mvc\MvcEvent;
  */
 class Module
 {
-    /**
-     * Get module configuration
-     *
-     * @return array
-     */
-    public function getConfig()
-    {
-        return include __DIR__ . '/config/module.config.php';
-    }
-
     /**
      * Get autoloader configuration
      *
@@ -65,37 +52,5 @@ class Module
                 ],
             ],
         ];
-    }
-
-    /**
-     * Initialize the module
-     *
-     * @param ModuleManager $m Module manager
-     *
-     * @return void
-     *
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    public function init(ModuleManager $m)
-    {
-    }
-
-    /**
-     * Bootstrap the module
-     * 
-     * DbSbg: Call custom Bootstrapper
-     *
-     * @param MvcEvent $e Event
-     *
-     * @return void
-     *
-     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
-     */
-    public function onBootstrap(MvcEvent $e)
-    {
-      // DbSbg: Use custom Bootstrapper which in turn calls the Initializer class
-      // in module DbSbgTheme which is responsible for removing the "ui" cookie.
-      $bootstrapper = new Bootstrapper($e);
-      $bootstrapper->bootstrap();
     }
 }
