@@ -88,5 +88,5 @@ function build_browse
     touch "$index_dir/${browse}_browse.db-ready"
 }
 build_browse "title" "title_fullStr" 1 "-Dbibleech=StoredFieldLeech -Dsortfield=title_sort -Dvaluefield=title_fullStr"
-build_browse "topic" "subjectChainTopic_txtF_mv" 1
+build_browse "topic" "subjectChainTopic_str_mv" 1
 build_browse "author" "author_browse" 1
