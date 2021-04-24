@@ -344,7 +344,7 @@ ids:
 
 TopicBrowse:
   QueryFields:
-    topic_browse:
+    subjectChainTopic_str_mv:
       - [onephrase, ~]
 
 AuthorBrowse:
