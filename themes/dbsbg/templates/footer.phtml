@@ -31,10 +31,10 @@
         <h2><?=$this->transEsc('Need Help?')?></h2>
         <ul>
           <li><a href="<?=$this->url('help-home')?>?topic=search&amp;_=<?=time() ?>" data-lightbox class="help-link"><?=$this->transEsc('Search Tips')?></a></li>
+          <?php // DbSbg: Linking to custom content pages ?>
+          <li><a href="<?=$this->url('content-page', ['page' => 'about']) ?>"><?=$this->transEsc('about')?></a></li>
+          <li><a href="<?=$this->url('content-page', ['page' => 'privacy']) ?>"><?=$this->transEsc('privacy_statement')?></a></li>
           <li><a href="https://www.kirchen.net/dbs/home/" target="_blank">Diözesanbibliothek Salzburg</a></li>
-          
-          
-          
           <?php
           /*
           // DbSbg: Removed unneccessary links - maybe used later
