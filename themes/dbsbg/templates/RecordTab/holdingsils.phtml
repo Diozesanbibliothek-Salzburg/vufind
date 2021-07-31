@@ -72,10 +72,20 @@
 <?php foreach ($holdings['holdings'] ?? [] as $holding): ?>
 <h3>
   <?php $locationText = $this->transEscWithPrefix('location_', $holding['location']); ?>
+  <?php // DbSbg: Get the library of the holding ?>
+  <?php $libraryText = $this->transEscWithPrefix('library_', $holding['library']); ?>
   <?php if ($holding['locationhref'] ?? false): ?>
     <a href="<?=$holding['locationhref']?>" target="_blank"><?=$locationText?></a>
+    <?php // DbSbg: Display the library of the holding if it is set ?>
+    <?php if ($libraryText && !empty($libraryText)): ?>
+        (<?=$libraryText?>)
+    <?php endif; ?>
   <?php else: ?>
     <?=$locationText?>
+    <?php // DbSbg: Display the library of the holding if it is set ?>
+    <?php if ($libraryText && !empty($libraryText)): ?>
+        (<?=$libraryText?>)
+    <?php endif; ?>
   <?php endif; ?>
 </h3>
 <table class="table table-striped">
@@ -83,7 +93,8 @@
   <?php $callNos = $this->tab->getUniqueCallNumbers($holding['items']); if (!empty($callNos)): ?>
   <tr>
     <th><?=$this->transEsc("Call Number")?>: </th>
-    <td width="50%">
+    <?php // DbSbg: Set colspan to 2 as we show an additional column for the item policy in RecordTab/holdingsils/standard.phtml ?>
+    <td width="50%" colspan="2">
       <?php foreach ($callNos as $callNo): ?>
         <?php if ($this->callnumberHandler): ?>
           <a href="<?=$this->url('alphabrowse-home') ?>?source=<?=$this->escapeHtmlAttr($this->callnumberHandler) ?>&amp;from=<?=$this->escapeHtmlAttr($callNo) ?>"><?=$this->escapeHtml($callNo)?></a>
