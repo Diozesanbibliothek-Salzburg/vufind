@@ -69,6 +69,71 @@
   );?>
 <?php endif; ?>
 
+<?php // DbSbg: Show summarized holdings ?>
+<?php if(isset($holdings['summarizedHoldings']) && !empty($holdings['summarizedHoldings'])): ?>
+  <div class='holdings'>
+    <h3><?=$this->transEsc('summarizedHoldings')?></h3>
+    <?php
+    $hasLibrary = empty(array_filter(array_column($holdings['summarizedHoldings'], 'library'))) ? false : true;
+    $hasLocation = empty(array_filter(array_column($holdings['summarizedHoldings'], 'location'))) ? false : true;
+    $hasCallnumber = empty(array_filter(array_column($holdings['summarizedHoldings'], 'callnumber'))) ? false : true;
+    $hasCallnumberNotes = empty(array_filter(array_column($holdings['summarizedHoldings'], 'callnumber_notes'))) ? false : true;
+    $hasHolsAva = empty(array_filter(array_column($holdings['summarizedHoldings'], 'holdings_available'))) ? false : true;
+    $hasGaps = empty(array_filter(array_column($holdings['summarizedHoldings'], 'gaps'))) ? false : true;
+    $hasHoldingsNotes = empty(array_filter(array_column($holdings['summarizedHoldings'], 'holdings_notes'))) ? false : true;
+    ?>
+    <table class="table table-striped">
+        <tr>
+            <?php if ($hasLibrary): ?><th><?=$this->transEsc('Library')?></th><?php endif; ?>
+            <?php if ($hasLocation): ?><th><?=$this->transEsc('Location')?></th><?php endif; ?>
+            <?php if ($hasCallnumber): ?><th><?=$this->transEsc('Call Number')?></th><?php endif; ?>
+            <?php if ($hasCallnumberNotes): ?><th><?=$this->transEsc('callNumberNote')?></th><?php endif; ?>
+            <?php if ($hasHolsAva): ?><th><?=$this->transEsc('summarizedHoldings')?></th><?php endif; ?>
+            <?php if ($hasGaps): ?><th><?=$this->transEsc('gaps')?></th><?php endif; ?>
+            <?php if ($hasHoldingsNotes): ?><th><?=$this->transEsc('holdingNote')?></th><?php endif; ?>
+        </tr>
+        <?php foreach($holdings['summarizedHoldings'] as $sumHolding): ?>
+          <?php if ($sumHolding && !empty($sumHolding)): ?>
+          <tr>
+            <?php
+            // DbSbg: Get subarray data
+            $gaps = [];
+            $callnumberNotes = [];
+            $holdingsNotes = [];
+            if ($data = $sumHolding['gaps']) {
+                foreach ($data as $gap) {
+                    $gaps[] = $gap;
+                }
+            }
+            if ($data = $sumHolding['callnumber_notes']) {
+                foreach ($data as $callnumberNote) {
+                    $callnumberNotes[] = $callnumberNote;
+                }
+            }
+            if ($data = $sumHolding['holdings_notes']) {
+                foreach ($data as $holdingsNote) {
+                    $holdingsNotes[] = $holdingsNote;
+                }
+            }
+            // DbSbg: Transform subarray data to string
+            $gaps = implode(', ', array_filter($gaps));
+            $callnumberNotes = implode(', ', array_filter($callnumberNotes));
+            $holdingsNotes = implode(', ', array_filter($holdingsNotes));
+            ?>
+            <?php if ($hasLibrary): ?><td><?=$this->transEscWithPrefix('library_', $sumHolding['library'])?></td><?php endif; ?>
+            <?php if ($hasLocation): ?><td><?=$this->transEscWithPrefix('location_', $sumHolding['location'])?></td><?php endif; ?>
+            <?php if ($hasCallnumber): ?><td><?=$this->escapeHtml($sumHolding['callnumber'])?></td><?php endif; ?>
+            <?php if ($hasCallnumberNotes): ?><td><?=$this->escapeHtml($callnumberNotes)?></td><?php endif; ?>
+            <?php if ($hasHolsAva): ?><td><?=$this->escapeHtml($sumHolding['holdings_available'])?></td><?php endif; ?>
+            <?php if ($hasGaps): ?><td><?=$this->escapeHtml($gaps)?></td><?php endif; ?>
+            <?php if ($hasHoldingsNotes): ?><td><?=$this->escapeHtml($holdingsNotes)?></td><?php endif; ?>
+          </tr>
+          <?php endif; ?>
+        <?php endforeach; ?>
+    </table>
+  </div>
+<?php endif; ?>
+
 <?php foreach ($holdings['holdings'] ?? [] as $holding): ?>
 <h3>
   <?php $locationText = $this->transEscWithPrefix('location_', $holding['location']); ?>
@@ -90,44 +155,37 @@
 </h3>
 <table class="table table-striped">
   <caption class="sr-only"><?=$this->transEsc('holdings_details_from', ['%%location%%' => $this->transEsc($holding['location'])]) ?></caption>
-  <?php $callNos = $this->tab->getUniqueCallNumbers($holding['items']); if (!empty($callNos)): ?>
+  <?php // DbSbg: Check if we have data from Alma. ?>
+  <?php
+  $hasCallnumber = empty(array_filter(array_column($holding['items'], 'callnumber'))) ? false : true;
+  $hasBarcode = empty(array_filter(array_column($holding['items'], 'barcode'))) ? false : true;
+  // DbSbg: Check if there is at least one item policy that should be displayed
+  $displayItemPolicyColumn = in_array(false, array_column($holding['items'], 'item_policy_hide'));
+  $hasItemPolicy = empty(array_filter(array_column($holding['items'], 'item_policy_code'))) ? false : $displayItemPolicyColumn;
+  $hasDescription = empty(array_filter(array_column($holding['items'], 'description'))) ? false : true;
+  $hasItemNotes = empty(array_filter(array_column($holding['items'], 'item_notes'))) ? false : true;
+  ?>
   <tr>
-    <th><?=$this->transEsc("Call Number")?>: </th>
-    <?php // DbSbg: Set colspan to 2 as we show an additional column for the item policy in RecordTab/holdingsils/standard.phtml ?>
-    <td width="50%" colspan="2">
-      <?php foreach ($callNos as $callNo): ?>
-        <?php if ($this->callnumberHandler): ?>
-          <a href="<?=$this->url('alphabrowse-home') ?>?source=<?=$this->escapeHtmlAttr($this->callnumberHandler) ?>&amp;from=<?=$this->escapeHtmlAttr($callNo) ?>"><?=$this->escapeHtml($callNo)?></a>
-        <?php else: ?>
-          <?=$this->escapeHtml($callNo)?>
-        <?php endif; ?>
-        <br />
-      <?php endforeach; ?>
-    </td>
+    <?php if ($hasCallnumber): ?><th><?=$this->transEsc('Call Number')?></th><?php endif; ?>
+    <?php if ($hasBarcode): ?><th><?=$this->transEsc('Barcode')?></th><?php endif; ?>
+    <?php if ($hasItemPolicy): ?><th><?=$this->transEsc('Exemplarrichtlinie')?></th><?php endif; ?>
+    <?php if ($hasDescription): ?><th><?=$this->transEsc('Description')?></th><?php endif; ?>
+    <?php if ($hasItemNotes): ?><th><?=$this->transEsc('ItemNotes')?></th><?php endif; ?>
+    <th><?=$this->transEsc('Availability')?></th>
   </tr>
-  <?php endif; ?>
-  <?php foreach ($holding['textfields'] ?? [] as $textFieldName => $textFields): ?>
-    <tr>
-      <?php // Translation for summary is a special case for backwards-compatibility ?>
-      <th><?=$textFieldName == 'summary' ? $this->transEsc("Volume Holdings") : $this->transEsc(ucfirst($textFieldName))?>:</th>
-      <td>
-        <?php foreach ($textFields as $current): ?>
-          <?=$this->linkify($this->escapeHtml($current))?><br/>
-        <?php endforeach; ?>
-      </td>
-    </tr>
-  <?php endforeach; ?>
   <?php foreach ($holding['items'] as $row): ?>
     <?php
         try {
             echo $this->context($this)->renderInContext(
                 'RecordTab/holdingsils/' . $this->tab->getTemplate() . '.phtml',
-                ['holding' => $row]
+                ['holding' => $row, 'hasCallnumber' => $hasCallnumber, 'hasBarcode' => $hasBarcode,
+                'hasItemPolicy' => $hasItemPolicy, 'hasDescription' => $hasDescription, 'hasItemNotes' => $hasItemNotes]
             );
         } catch (Exception $e) {
             echo $this->context($this)->renderInContext(
                 'RecordTab/holdingsils/standard.phtml',
-                ['holding' => $row]
+                ['holding' => $row, 'hasCallnumber' => $hasCallnumber, 'hasBarcode' => $hasBarcode,
+                'hasItemPolicy' => $hasItemPolicy, 'hasDescription' => $hasDescription, 'hasItemNotes' => $hasItemNotes]
             );
         }
     ?>
@@ -161,7 +219,7 @@
 <?php // DbSbg: No holdings available?>
 <div class='holdings noHoldings'>
 <?php // DbSbg: Check if there are no holdings (or URLs - uncomment below) ?>
-  <?php if (empty($holdings['holdings']) /*&& empty($urls)*/): ?>
+  <?php if (empty($holdings['holdings']) /*&& empty($urls)*/ && empty($holdings['summarizedHoldings'])): ?>
     <h3><?=$this->transEsc("holdingNote")?>:</h3>
     <div class="padding-online-content">
         <?php // DbSbg: Show information that there are no holdings ?>

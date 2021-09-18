@@ -63,6 +63,9 @@ class Alma extends \VuFind\ILS\Driver\Alma
      */
     public function getHolding($id, $patron = null, array $options = [])
     {
+        // DbSbg: Get item policies that should be hidden
+        $itemPoliciesToHide = $this->config['Holdings']['itemPolicyToHide'] ?? null;
+
         // Prepare result array with default values. If no API result can be received
         // these will be returned.
         $results['total'] = 0;
@@ -120,8 +123,14 @@ class Alma extends \VuFind\ILS\Driver\Alma
 
                 $description = null;
                 if (!empty($item->item_data->description)) {
-                    $number = (string)$item->item_data->description;
                     $description = (string)$item->item_data->description;
+                }
+
+                // DbSbg: Get item policy code and check if it should be hidden
+                $itemPolicyCode = (string)$item->item_data->policy ?: null;
+                $itemPolicyHide = false;
+                if ($itemPoliciesToHide && $itemPolicyCode) {
+                    $itemPolicyHide = in_array($itemPolicyCode, $itemPoliciesToHide);
                 }
 
                 $results['holdings'][] = [
@@ -137,7 +146,7 @@ class Alma extends \VuFind\ILS\Driver\Alma
                     'duedate' => $duedate,
                     'returnDate' => false, // TODO: support recent returns
                     'number' => $number,
-                    'barcode' => empty($barcode) ? 'n/a' : $barcode,
+                    'barcode' => empty($barcode) ? null : $barcode,
                     'item_notes' => $itemNotes ?? null,
                     'item_id' => $itemId,
                     'holding_id' => $holdingId,
@@ -146,9 +155,10 @@ class Alma extends \VuFind\ILS\Driver\Alma
                     // For Alma title-level hold requests
                     'description' => $description ?? null,
                     // DbSbg: Add some more information from Alma
-                    'item_policy_code' => (string)$item->item_data->policy ?: null,
+                    'item_policy_code' => $itemPolicyCode,
                     'item_policy_desc' => (string)$item->item_data->policy
                         ->attributes()['desc'] ?: null,
+                    'item_policy_hide' => $itemPolicyHide,
                     'library' => $this->getTranslatableString($item->item_data
                         ->library)
                 ];
@@ -173,7 +183,178 @@ class Alma extends \VuFind\ILS\Driver\Alma
             $results['electronic_holdings'] = $electronic;
         }
 
+        // DbSbg: If we have no items in the holdings, check if there are summarized
+        // holdings (which are very specific to austrian libraries)
+        if (empty($results['holdings'])) {
+            $summarizedHoldings = $this->getSummarizedHoldings($id);
+            $results['summarizedHoldings'] = $summarizedHoldings;
+        }
+        
         return $results;
+    }
+
+    /**
+     * Get summarized holdings and add it to the holdings array that is returned from
+     * the default Alma ILS driver. This is quite specific to Austrian libraries.
+     * See below for information on used MARC fields
+     * 
+     * TODO:
+     *  - Less nesting in code below.
+     *  - Fields 852b and 852c are not repeated in Austrian libraries, but we should
+     *    consider the fact that these fields are repeatable according to the
+     *    official Marc21 documentation.
+     *  
+     * Marc holding field 852
+     * See https://wiki.obvsg.at/Katalogisierungshandbuch/KategorienuebersichtB852FE
+     * - Library Code:      tag=852 ind1=8 ind2=1|# subfield=b
+     * - Location:          tag=852 ind1=8 ind2=1|# subfield=c
+     * - Call No.:          tag=852 ind1=8 ind2=1|# subfield=h
+     * - Note on call no.:  tag=852 ind1=8 ind2=1|# subfield=z
+     * 
+     * Marc holding field 866
+     * See https://wiki.obvsg.at/Katalogisierungshandbuch/KategorienuebersichtB866FE
+     * - Summarized holdings:   tag=866 ind1=3 ind2=0 subfield=a
+     * - Gaps:                  tag=866 ind1=3 ind2=0 subfield=z
+     * - Prefix text for summarized holdings:
+     *                          tag=866 ind1=# ind2=0 subfield=a
+     * - Note for summarized holdings:
+     *                          tag=866 ind1=# ind2=0 subfield=z
+     * 
+     * @param string $id
+     * 
+     * @return array
+     */
+    public function getSummarizedHoldings($id)
+    {
+        // Initialize variables
+        $summarizedHoldings = [];
+
+        // Path to Alma holdings API
+        $holdingsPath = '/bibs/' . urlencode($id) . '/holdings';
+
+        // Get holdings from Alma API
+        if ($almaApiResult = $this->makeRequest($holdingsPath)) {
+            // Get the holding details from the API result
+            $almaHols = $almaApiResult->holding ?? null;
+
+            // Check if the holding details object is emtpy
+            if (!empty($almaHols)) {
+                foreach ($almaHols as $almaHol) {
+
+                    // Get the holding IDs
+                    $holId = (string)$almaHol->holding_id;
+
+                    // Get the single MARC holding record based on the holding ID
+                    if ($marcHol = $this->makeRequest($holdingsPath.'/'.$holId)) {
+                        if ($marcHol != null && !empty($marcHol)) {
+                            
+                            if (isset($marcHol->record)) {
+                                // Get the holdings record from the API as a
+                                // File_MARCXML object for better processing below.
+                                $marc = new \File_MARCXML(
+                                    $marcHol->record->asXML(),
+                                    \File_MARCXML::SOURCE_STRING
+                                );
+
+                                // Read the Marc holdings record
+                                if ($marcRec = $marc->next()) {
+                                    
+                                    // Get values only if we have an 866 field.
+                                    if ($fs866 = $marcRec->getFields('866')) {
+                                        $libCodes = null;
+                                        $locCodes = null;
+                                        $callNo = null;
+                                        $callNoNote = null;
+                                        $sumHoldings = null;
+                                        $gaps = null;
+                                        $sumHoldingsPrefix = null;
+                                        $sumHoldingsNote = null;
+                                        
+                                        // Process 852 field(s)
+                                        if ($fs852 = $marcRec->getFields('852')) {
+                                            // Iterate over all 852 fields available
+                                            foreach ($fs852 as $f852) {
+                                                // Check if ind1 is '8'. We only
+                                                // process these fields
+                                                if ($f852->getIndicator('1')=='8') {
+                                                    // Add data from subfields to
+                                                    // arrays as their key for having
+                                                    // unique values. We just use
+                                                    // 'true' as array values.
+                                                    foreach ($f852->getSubfields('b')
+                                                        as $f852b) {
+                                                        $libCodes[$f852b
+                                                            ->getData()] = true;
+                                                    }
+                                                    foreach ($f852->getSubfields('c')
+                                                        as $f852c) {
+                                                        $locCodes[$f852c
+                                                            ->getData()] = true;
+                                                    }
+                                                    foreach ($f852->getSubfields('h')
+                                                        as $f852h) {
+                                                        $callNo[$f852h
+                                                            ->getData()] = true;
+                                                    }
+                                                    foreach ($f852->getSubfields('z')
+                                                        as $f852z) {
+                                                        $callNoNote[$f852z
+                                                            ->getData()] = true;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Iterate over all 866 fields available
+                                        foreach ($fs866 as $f866) {
+                                            // Check if ind1 is '3'
+                                            if ($f866->getIndicator('1') == '3') {
+                                                foreach ($f866->getSubfields('a')
+                                                    as $f86630a) {
+                                                    $sumHoldings[$f86630a
+                                                        ->getData()] = true;
+                                                }
+                                                foreach ($f866->getSubfields('z')
+                                                    as $f86630z) {
+                                                    $gaps[$f86630z
+                                                        ->getData()] = true;
+                                                }
+                                            }
+                                            // Check if ind1 is 'blank'
+                                            if ($f866->getIndicator('1') == ' ') {
+                                                foreach ($f866->getSubfields('a')
+                                                    as $f866_0a) {
+                                                    $sumHoldingsPrefix[$f866_0a
+                                                        ->getData()] = true;
+                                                }
+                                                foreach ($f866->getSubfields('z')
+                                                    as $f866_0z) {
+                                                    $sumHoldingsNote[$f866_0z
+                                                        ->getData()] = true;
+                                                }
+                                            }
+                                        }
+
+                                        $summarizedHoldings[] = [
+                                            'library' => ($libCodes) ? implode(', ', array_keys($libCodes)) : null,
+                                            'location' => ($locCodes) ? implode(', ', array_keys($locCodes)) : 'UNASSIGNED',
+                                            'callnumber' => ($callNo) ? implode(', ', array_keys($callNo)) : null,
+                                            'callnumber_notes' => ($callNoNote) ? array_keys($callNoNote) : null,
+                                            'holdings_available' => ($sumHoldings) ? implode(', ', array_keys($sumHoldings)) : null,
+                                            'gaps' => ($gaps) ? array_keys($gaps) : null,
+                                            'holdings_prefix' => ($sumHoldingsPrefix) ? implode(', ', array_keys($sumHoldingsPrefix)) : null,
+                                            'holdings_notes' => ($sumHoldingsNote) ? array_keys($sumHoldingsNote) : null,
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return empty(array_filter($summarizedHoldings)) ? [] : $summarizedHoldings;
     }
 
 }
