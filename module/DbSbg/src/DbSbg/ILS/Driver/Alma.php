@@ -189,7 +189,7 @@ class Alma extends \VuFind\ILS\Driver\Alma
             $summarizedHoldings = $this->getSummarizedHoldings($id);
             $results['summarizedHoldings'] = $summarizedHoldings;
         }
-        
+
         return $results;
     }
 
@@ -335,9 +335,39 @@ class Alma extends \VuFind\ILS\Driver\Alma
                                             }
                                         }
 
+                                        // DbSbg: Get library and location names from
+                                        // Alma config API
+                                        $libNames = [];
+                                        $locNames = [];
+                                        if ($libCodes && $locCodes) {
+                                            $libConfs = [];
+                                            foreach (array_keys($libCodes) as
+                                                $libCode) {
+                                                $libConfs[] =
+                                                    $this->getLocationData($libCode);
+                                            }
+
+                                            foreach ($libConfs as
+                                                $libConf) {                                        
+                                                foreach (array_keys($locCodes) as
+                                                    $locCode) { 
+                                                    $locConf =
+                                                        $libConf[$locCode]
+                                                        ?? null;
+                                                    $libNames[] =
+                                                        $locConf['library_name']
+                                                        ?? null;
+                                                    $locNames[] =
+                                                        $locConf['external_name']
+                                                        ?: $locConf['name']
+                                                        ?? null;
+                                                }
+                                            }
+                                        }
+                                        
                                         $summarizedHoldings[] = [
-                                            'library' => ($libCodes) ? implode(', ', array_keys($libCodes)) : null,
-                                            'location' => ($locCodes) ? implode(', ', array_keys($locCodes)) : 'UNASSIGNED',
+                                            'library' => (!empty($libNames)) ? implode(', ', array_filter($libNames)) : null,
+                                            'location' => (!empty($locNames)) ? implode(', ', array_filter($locNames)) : 'UNASSIGNED',
                                             'callnumber' => ($callNo) ? implode(', ', array_keys($callNo)) : null,
                                             'callnumber_notes' => ($callNoNote) ? array_keys($callNoNote) : null,
                                             'holdings_available' => ($sumHoldings) ? implode(', ', array_keys($sumHoldings)) : null,
@@ -355,6 +385,60 @@ class Alma extends \VuFind\ILS\Driver\Alma
         }
         
         return empty(array_filter($summarizedHoldings)) ? [] : $summarizedHoldings;
+    }
+
+    /**
+     * DbSbg: Get data for all locations of a library or for a single location. The
+     * location data are cached with a lifetime of 3600 seconds. After saving the
+     * data to the cache the cache lifetime is reset to the saved default value.
+     *
+     * @param string $library   The code of a library in Alma
+     * @param string $location  The code of a location in Alma (optional)
+     * 
+     * @return array An array with data of all locations of a given library (if
+     *               $location is not set) or the data of a single location. An empty
+     *               array if no results were found.
+     */
+    public function getLocationData($library, $location = null) {
+        $libCacheKey = $library.'_Locations';
+        $savedCacheLifetime = $this->cacheLifetime;
+        $this->cacheLifetime = 3600;
+        $locations = $this->getCachedData($libCacheKey);
+        $this->cacheLifetime = $savedCacheLifetime;
+
+        if ($locations === null && !empty($library)) {
+            $locations = [];
+
+            // Get library data
+            $libraryData = $this->makeRequest(
+                '/conf/libraries/'.urlencode($library)
+            );
+
+            // Get all locations for the given library
+            $locationsForLib = $this->makeRequest(
+                '/conf/libraries/'.urlencode($library).'/locations'
+            );
+
+            foreach($locationsForLib->location as $loc) {
+                $locations[(string)$loc->code] = [
+                    'name' => (string)$loc->name ?? null,
+                    'external_name' => (string)$loc->external_name ?? null,
+                    'type' => (string)$loc->type ?? null,
+                    'suppress_from_publishing' =>
+                        ((string)$loc->suppress_from_publishing == 'false')
+                        ? false
+                        : true,
+                    'fulfillment_unit' => (string)$loc->fulfillment_unit ?? null,
+                    'library_code' => $library,
+                    'library_name' => (string)$libraryData->name ?? null
+                ];
+            }
+            
+            // Write the data to the cache
+            $this->putCachedData($libCacheKey, $locations);
+        }
+
+        return (empty($location)) ? $locations ?? [] : $locations[$location] ?? [];
     }
 
 }
