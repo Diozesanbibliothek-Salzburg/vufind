@@ -157,7 +157,11 @@
   <caption class="sr-only"><?=$this->transEsc('holdings_details_from', ['%%location%%' => $this->transEsc($holding['location'])]) ?></caption>
   <?php // DbSbg: Check if we have data from Alma. ?>
   <?php
-  $hasCallnumber = empty(array_filter(array_column($holding['items'], 'callnumber'))) ? false : true;
+  $translatableCallnumbers = [];
+  foreach (array_column($holding['items'], 'callnumber') as $translatableCallnumber) {
+    $translatableCallnumbers[] = $translatableCallnumber->getDisplayString() ?: null ?? null;
+  }
+  $hasCallnumber = empty(array_filter($translatableCallnumbers)) ? false : true;
   $hasBarcode = empty(array_filter(array_column($holding['items'], 'barcode'))) ? false : true;
   // DbSbg: Check if there is at least one item policy that should be displayed
   $displayItemPolicyColumn = in_array(false, array_column($holding['items'], 'item_policy_hide'));
