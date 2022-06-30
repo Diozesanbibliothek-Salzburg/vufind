@@ -198,6 +198,10 @@ class RecordDataFormatterFactory
             'Related Items', 'getAllRecordLinks', 'data-allRecordLinks.phtml'
         );
         $spec->setTemplateLine('Tags', true, 'data-tags.phtml');
+
+        // DbSbg: Show AC-Number
+        $spec->setLine('ACNo', 'getAcNo');
+
         return $spec->getArray();
     }
 

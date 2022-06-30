@@ -38,10 +38,17 @@ namespace DbSbg\RecordDriver;
  */
 class SolrMarc extends \VuFind\RecordDriver\SolrMarc
 {
-    // DbSbg: Use custom trait
+    
+    /**
+     * DbSbg: Use custom trait
+     */
     use MarcCustomTrait;
 
-    // DbSbg: Get all authors
+    /**
+     * DbSbg: Get all authors
+     *
+     * @return array All authors as array
+     */
     public function getAllAuthors() {
       $a1 = isset($this->fields['author']) ? (array)$this->fields['author'] : [];
       $a2 = isset($this->fields['author2']) ? (array)$this->fields['author2'] : [];
@@ -50,6 +57,22 @@ class SolrMarc extends \VuFind\RecordDriver\SolrMarc
       
         return array_merge($a1, $c, $a2);
     }
-    
+
+    /**
+     * DbSbg: Get AC number (Austrian Catalogue number) from Solr field acNo_txt.
+     * Fallback to MarcXML if there is no such field. This is very specific to
+     * Austrian libraries.
+     *
+     * @return string|array|null  The AC number as string or array or null
+     */
+    public function getAcNo() {
+        $acNo = $this->fields['acNo_txt'] ?? null;
+        if ($acNo == null || empty($acNo)) {
+            $acNo = ($this->getMarcRecord()->getField('009'))
+                ? $this->getMarcRecord()->getField('009')->getData()
+                : null;
+        }
+        return $acNo;
+    }
 
 }
