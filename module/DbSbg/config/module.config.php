@@ -4,10 +4,29 @@ namespace DbSbg\Module\Configuration;
 $config = [
   'controllers' => [
     'factories' => [
-        'DbSbg\Controller\BrowseController' => 'VuFind\Controller\AbstractBaseWithConfigFactory'
+        'DbSbg\Controller\BrowseController' => 'VuFind\Controller\AbstractBaseWithConfigFactory',
+        'DbSbg\Controller\LocalFileController' => 'VuFind\Controller\AbstractBaseFactory',
+        'DbSbg\Controller\SearchController' => 'VuFind\Controller\AbstractBaseFactory'
     ],
     'aliases' => [
-        'VuFind\Controller\BrowseController' => 'DbSbg\Controller\BrowseController'
+        'LocalFile' => 'DbSbg\Controller\LocalFileController',
+        'localfile' => 'DbSbg\Controller\LocalFileController',
+        'VuFind\Controller\BrowseController' => 'DbSbg\Controller\BrowseController',
+        'VuFind\Controller\SearchController' => 'DbSbg\Controller\SearchController'
+    ]
+  ],
+  'router' => [
+    'routes' => [
+        'localfile-open' => [
+            'type' => 'Laminas\Router\Http\Literal',
+            'options' => [
+                'route' => '/LocalFile/Open',
+                'defaults' => [
+                    'controller' => 'LocalFile',
+                    'action' => 'Open',
+                ]
+            ]
+        ]
     ]
   ],
   'service_manager' => [
