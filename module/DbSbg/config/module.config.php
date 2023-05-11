@@ -72,4 +72,11 @@ $config = [
   ]
 ];
 
+$staticRoutes = [
+    'Search/Export'
+];
+
+$routeGenerator = new \VuFind\Route\RouteGenerator();
+$routeGenerator->addStaticRoutes($config, $staticRoutes);
+
 return $config;

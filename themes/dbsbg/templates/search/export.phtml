@@ -1,0 +1,26 @@
+
+<?php
+    // Set page title.
+    $this->headTitle($this->translate('Export search results'));
+?>
+
+<h2><?=$this->transEsc('Export search results')?></h2>
+
+<p>
+    Hier können Sie die aktuellen Suchergebnisse exportieren. Ein Export größerer
+    Ergebnismengen kann etwas länger dauern.
+</p>
+<p>
+    <strong>
+        Bitte schließen Sie das Fenster nicht, bis der Export fertig ist, da nach
+        dem Abschluss des Vorgangs ein Link zum Download der Exportdatei angezeigt wird.
+    </strong>
+</p>
+<p>
+    <?=$this->flashmessages()?>
+</p>
+<p>
+    <form name="exportSearchResults" id="exportSearchResults" method="post">
+    <input type="submit" class="btn btn-default" name="submitExportSearchResults" value="<?=$this->transEscAttr("Export search results")?>" />
+    </form>
+</p>
