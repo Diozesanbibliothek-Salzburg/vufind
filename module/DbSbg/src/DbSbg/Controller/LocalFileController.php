@@ -68,7 +68,11 @@ class LocalFileController extends \VuFind\Controller\AbstractBase
             header('Content-Description: File Transfer');
             header('Pragma: public');
             
+            // Send file for download
             readfile($fullFilePath);
+
+            // Exit for not appending current page HTML
+            exit();
         } else {
             return $this->createViewModel(['filename' => $filename]);
         }

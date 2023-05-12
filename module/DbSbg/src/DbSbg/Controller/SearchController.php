@@ -143,7 +143,7 @@ class SearchController extends \VuFind\Controller\SearchController
             ];
 
             // Return "success" page with button for downloading the file
-            return $this->redirectToSource('success', $msg);
+            return $this->redirectToSource('success', $msg, $filename);
         }
 
         return $view;
@@ -157,7 +157,7 @@ class SearchController extends \VuFind\Controller\SearchController
      * 
      * @return void
      */
-    public function redirectToSource($flashNamespace = null, $flashMsg = null)
+    public function redirectToSource($flashNamespace = null, $flashMsg = null, $filename = null)
     {
         // Set flash message if requested:
         if (null !== $flashNamespace && !empty($flashMsg)) {
@@ -335,6 +335,7 @@ class SearchController extends \VuFind\Controller\SearchController
      * Encode from UTF-8 to UTF-16LE. This is for CSV export on Windows.
      *
      * @param string  $text The text to encode from UTF-8 to UTF-16LE
+     * 
      * @return string       The UTF-16LE encoded text
      */
     protected function getWinEncodedText($text)
