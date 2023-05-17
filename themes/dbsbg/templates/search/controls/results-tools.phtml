@@ -3,7 +3,8 @@
   <a href="<?=$this->results->getUrlQuery()->setViewParam('rss')?>"><i class="fa fa-bell" aria-hidden="true"></i> <?=$this->transEsc('Get RSS Feed')?></a>
 
   <?php /* DbSbg: Link for opening the "export search results" modal dialog. The "static" backdrop avoids closing the dialog on a click outside of it. */ ?>
-  <a href="<?=$this->url('search-export')?><?=$this->results->getUrlQuery()->getParams()?>" data-lightbox data-backdrop="static">
+  <?php /* <a href="<?=$this->url('search-export')?><?=$this->results->getUrlQuery()->getParams()?>" data-lightbox data-backdrop="static"> */ ?>
+  <a href="/search/export<?=$this->results->getUrlQuery()->getParams()?>" data-lightbox data-backdrop="static">
     <i class="fa fa-download" aria-hidden="true"></i> <?=$this->transEsc('Export search results')?>
   </a>
 
