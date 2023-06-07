@@ -17,7 +17,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  *
  * @category VuFind
  * @package  Controller
@@ -64,7 +64,8 @@ class SearchController extends \VuFind\Controller\SearchController
             $request['limit'] = 200;
             
             // Get search runner
-            $runner = $this->serviceLocator->get(\VuFind\Search\SearchRunner::class);
+            $runner =
+                $this->serviceLocator->get(\VuFind\Search\SearchRunner::class);
 
             // Execute search and get results for first page
             $results = $runner->run($request);
@@ -96,8 +97,8 @@ class SearchController extends \VuFind\Controller\SearchController
             $file = fopen($filepath, 'a');
 
             // Define the headings for the CSV
-            $headings[] = ['mmsid', 'ACNo', 'Title', /*'containerTitle',*/ 'Authors',
-                'place', 'Publisher', 'Date'];
+            $headings[] = ['mmsid', 'ACNo', 'Title', /*'containerTitle',*/
+                'Authors', 'place', 'Publisher', 'Date', 'holdingData'];
             
             // Translate headings
             $headingsTranslated[] = $this->getCsvTranslation(
@@ -107,7 +108,8 @@ class SearchController extends \VuFind\Controller\SearchController
             // Write headings to file
             $this->writeToFile($headingsTranslated, $file, $os, $sep);
 
-            // Get results of first page as record driver objects and write to file
+            // Get results of first page as record driver objects and write to
+            // file
             $this->writeToFile($this->getMetadata($results->getResults()), $file,
                 $os, $sep);
 
@@ -116,7 +118,8 @@ class SearchController extends \VuFind\Controller\SearchController
 
             // Get results for other pages (if any)
             for ($page=2; $page <= $pages; $page++) {
-                // Reset the execution time limit so that we don't get a timout error
+                // Reset the execution time limit so that we don't get a timout
+                // error
                 set_time_limit(30);
 
                 $request['page'] = $page;
@@ -124,10 +127,10 @@ class SearchController extends \VuFind\Controller\SearchController
                 // Execute search and get results
                 $results = $runner->run($request);
 
-                // Get results of current page as record driver objects and write to
-                // file
-                $this->writeToFile($this->getMetadata($results->getResults()), $file,
-                    $os, $sep);
+                // Get results of current page as record driver objects and
+                // write to file
+                $this->writeToFile($this->getMetadata($results->getResults()),
+                    $file, $os, $sep);
             }
 
             // Close CSV file
@@ -157,7 +160,8 @@ class SearchController extends \VuFind\Controller\SearchController
      * 
      * @return void
      */
-    public function redirectToSource($flashNamespace = null, $flashMsg = null, $filename = null)
+    public function redirectToSource($flashNamespace = null, $flashMsg = null,
+        $filename = null)
     {
         // Set flash message if requested:
         if (null !== $flashNamespace && !empty($flashMsg)) {
@@ -208,7 +212,39 @@ class SearchController extends \VuFind\Controller\SearchController
                 : '';
             $placesRaw = $record->getPlacesOfPublication();
             $places = (!empty($placesRaw)) ? implode('; ', $placesRaw) : '';
-             
+
+            // Get holding data from the Marc record
+            $allHoldingData = [];
+            $holdingDataRaw = $record->getExportData();
+            foreach ($holdingDataRaw as $holPid => $holdingData) {
+                $holdingData = array_filter($holdingData);
+                $library = ($holdingData['library'] ?? false)
+                    ? $this->translate('Library').': '.$holdingData['library']
+                    : null;
+                $location = ($holdingData['location'] ?? false)
+                    ? $this->translate('Location').': '.$holdingData['location']
+                    : null;
+                $callnumber = ($holdingData['callnumber'] ?? false)
+                    ? $this->translate('Call Number').': '
+                        .$holdingData['callnumber']
+                    : null;
+                $holding = ($holdingData['holding'] ?? false)
+                    ? $this->translate('summarizedHoldings').': '
+                        .$holdingData['holding']
+                    : null;
+                $gaps = ($holdingData['gaps'] ?? false)
+                    ? $this->translate('gaps').': '.$holdingData['gaps']
+                    : null;
+                $data = implode(', ', array_filter(
+                    [$library, $location, $callnumber, $holding, $gaps]
+                ));
+                $allHoldingData[] = $data;                    
+            }
+
+            $allHoldingDataStr = null;
+            if (!empty($allHoldingData)) {
+                $allHoldingDataStr = implode('; ', $allHoldingData);
+            }
 
             $metadata[] = [
                 'mmsId' => $mmsId,
@@ -218,7 +254,8 @@ class SearchController extends \VuFind\Controller\SearchController
                 'authors' => $authors,
                 'places' => $places,
                 'publishers' => $publishers,
-                'dates' => $dates
+                'dates' => $dates,
+                'holdings' => $allHoldingDataStr
             ];
         }
 
@@ -254,10 +291,10 @@ class SearchController extends \VuFind\Controller\SearchController
             foreach ($csvValues as $csvValue) {
                 fputcsv($file, array_values($csvValue), $sep, '"');
             }
-            
         } catch (\Exception $e) {
-            throw new \VuFind\Exception\ILS('Error while exporting search resuls ' .
-                ' | ' .$e->getMessage());
+            throw new \VuFind\Exception\ILS(
+                'Error while exporting search resuls | ' .$e->getMessage()
+            );
         }        
     }
 
@@ -306,12 +343,12 @@ class SearchController extends \VuFind\Controller\SearchController
      * Translate CSV headings and, if neccessary, encode them for Windows.
      *
      * @param  array     $translate   Associative array of headings
-     * @param  boolean   $convert     Convert to Windows encoding (UTF-16LE) if true
+     * @param  boolean   $convert     Convert to Windows encoding (UTF-16LE) if 
+     *                                true
      * 
      * @return array                  Acssociative array of translated headings
      */
-    protected function getCsvTranslation($translate, $convertToWin)
-    {
+    protected function getCsvTranslation($translate, $convertToWin) {
         $csvHeadings = [];
         $translate = $translate[0];
 
@@ -338,8 +375,7 @@ class SearchController extends \VuFind\Controller\SearchController
      * 
      * @return string       The UTF-16LE encoded text
      */
-    protected function getWinEncodedText($text)
-    {
+    protected function getWinEncodedText($text) {
         return mb_convert_encoding($text, 'UTF-16LE', 'UTF-8');
     }
 
