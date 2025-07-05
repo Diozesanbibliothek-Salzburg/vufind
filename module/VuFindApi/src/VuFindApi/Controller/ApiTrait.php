@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Additional functionality for API controllers.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) The National Library 2015-2016.
  *
@@ -25,7 +26,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:controllers Wiki
  */
+
 namespace VuFindApi\Controller;
+
+use Exception;
+use Laminas\Http\Exception\InvalidArgumentException;
+use Laminas\Mvc\Exception\DomainException;
 
 /**
  * Additional functionality for API controllers.
@@ -65,7 +71,7 @@ trait ApiTrait
      * @param \Laminas\Mvc\MvcEvent $e Event
      *
      * @return mixed
-     * @throws Exception\DomainException
+     * @throws DomainException|InvalidArgumentException|Exception
      */
     public function onDispatch(\Laminas\Mvc\MvcEvent $e)
     {
@@ -80,7 +86,8 @@ trait ApiTrait
             // Disable session writes
             $this->disableSessionWrites();
             $headers->addHeaderLine(
-                'Access-Control-Allow-Methods', 'GET, POST, OPTIONS'
+                'Access-Control-Allow-Methods',
+                'GET, POST, OPTIONS'
             );
             $headers->addHeaderLine('Access-Control-Max-Age', '86400');
 
@@ -100,8 +107,12 @@ trait ApiTrait
         $request = $this->getRequest();
         $this->jsonpCallback
             = $request->getQuery('callback', $request->getPost('callback', null));
-        $this->jsonPrettyPrint = $request->getQuery(
-            'prettyPrint', $request->getPost('prettyPrint', false)
+        $this->jsonPrettyPrint = filter_var(
+            $request->getQuery(
+                'prettyPrint',
+                $request->getPost('prettyPrint', false)
+            ),
+            FILTER_VALIDATE_BOOLEAN
         );
         $this->outputMode = empty($this->jsonpCallback) ? 'json' : 'jsonp';
     }
@@ -115,10 +126,14 @@ trait ApiTrait
      */
     protected function isAccessDenied($permission)
     {
-        $auth = $this->serviceLocator
-            ->get(\LmcRbacMvc\Service\AuthorizationService::class);
+        $auth = $this->getService(\LmcRbacMvc\Service\AuthorizationService::class);
         if (!$auth->isGranted($permission)) {
-            return $this->output([], self::STATUS_ERROR, 403, 'Permission denied');
+            return $this->output(
+                [],
+                ApiInterface::STATUS_ERROR,
+                403,
+                'Permission denied'
+            );
         }
         return false;
     }
@@ -132,7 +147,7 @@ trait ApiTrait
      * @param string $message  Status message
      *
      * @return \Laminas\Http\Response
-     * @throws \Exception
+     * @throws Exception
      */
     protected function output($data, $status, $httpCode = null, $message = '')
     {
@@ -164,7 +179,7 @@ trait ApiTrait
             );
             return $response;
         } else {
-            throw new \Exception('Invalid output mode');
+            throw new Exception('Invalid output mode');
         }
     }
 }

@@ -1,8 +1,9 @@
 <?php
+
 /**
  * EDS Record Controller
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Controller;
 
 use Laminas\ServiceManager\ServiceLocatorInterface;
@@ -50,7 +52,7 @@ class EdsrecordController extends AbstractRecord
     public function __construct(ServiceLocatorInterface $sm)
     {
         // Override some defaults:
-        $this->searchClassId = 'EDS';
+        $this->sourceId = 'EDS';
         $this->fallbackDefaultTab = 'Description';
 
         // Call standard record controller initialization:
@@ -78,7 +80,12 @@ class EdsrecordController extends AbstractRecord
             }
             throw new ForbiddenException('Access denied.');
         }
-        return $this->redirect()->toUrl($driver->tryMethod($method));
+        $url = $driver->tryMethod($method);
+        if (!$url) {
+            $this->flashMessenger()->addErrorMessage($this->translate('error_accessing_full_text'));
+            return $this->redirect()->toRoute('edsrecord', ['id' => $this->params()->fromRoute('id')]);
+        }
+        return $this->redirect()->toUrl($url);
     }
 
     /**
@@ -118,9 +125,7 @@ class EdsrecordController extends AbstractRecord
      */
     protected function resultScrollerActive()
     {
-        $config = $this->serviceLocator->get(\VuFind\Config\PluginManager::class)
-            ->get('EDS');
-        return isset($config->Record->next_prev_navigation)
-            && $config->Record->next_prev_navigation;
+        $config = $this->getService(\VuFind\Config\PluginManager::class)->get('EDS');
+        return $config->Record->next_prev_navigation ?? false;
     }
 }

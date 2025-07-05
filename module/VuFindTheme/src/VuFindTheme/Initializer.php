@@ -1,8 +1,9 @@
 <?php
+
 /**
  * VuFind Theme Initializer
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,13 +26,14 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFindTheme;
 
-use Interop\Container\ContainerInterface;
 use Laminas\Config\Config;
 use Laminas\Mvc\MvcEvent;
 use Laminas\Stdlib\RequestInterface as Request;
 use Laminas\View\Resolver\TemplatePathStack;
+use Psr\Container\ContainerInterface;
 
 /**
  * VuFind Theme Initializer
@@ -52,6 +54,13 @@ class Initializer
     protected $config;
 
     /**
+     * Map of theme aliases to theme names (null if uninitialized)
+     *
+     * @var ?array
+     */
+    protected $themeMap =  null;
+
+    /**
      * Laminas MVC Event
      *
      * @var MvcEvent
@@ -59,9 +68,9 @@ class Initializer
     protected $event;
 
     /**
-     * Top-level service manager
+     * Top-level service container
      *
-     * @var \Laminas\ServiceManager\ServiceManager
+     * @var \Psr\Container\ContainerInterface
      */
     protected $serviceManager;
 
@@ -129,7 +138,7 @@ class Initializer
             $this->serviceManager = $eventOrContainer;
         } else {
             throw new \Exception(
-                'Illegal type for $eventOrContainer: ' . get_class($eventOrContainer)
+                'Illegal type for $eventOrContainer: ' . $eventOrContainer::class
             );
         }
 
@@ -146,7 +155,7 @@ class Initializer
     }
 
     /**
-     * Initialize the theme.  This needs to be triggered as part of the dispatch
+     * Initialize the theme. This needs to be triggered as part of the dispatch
      * event.
      *
      * @throws \Exception
@@ -166,9 +175,10 @@ class Initializer
         );
 
         // Determine theme options:
-        $this->sendThemeOptionsToView();
+        $this->sendThemeOptionsToView($currentTheme);
 
         // Make sure the current theme is set correctly in the tools object:
+        $error = null;
         try {
             $this->tools->setTheme($currentTheme);
         } catch (\Exception $error) {
@@ -189,6 +199,32 @@ class Initializer
     }
 
     /**
+     * Get a map of theme aliases to theme names.
+     *
+     * @return array
+     */
+    protected function getThemeAliasMap(): array
+    {
+        if ($this->themeMap === null) {
+            // Set up special-case 'standard' and 'mobile' aliases:
+            $this->themeMap = ['standard' => $this->config->theme];
+            if ($this->mobile->enabled()) {
+                $this->themeMap['mobile'] = $this->config->mobile_theme;
+            }
+
+            // Parse the alternate theme settings for additional options:
+            $parts = explode(',', $this->config->alternate_themes ?? '');
+            foreach ($parts as $part) {
+                $subparts = explode(':', $part);
+                if (!empty($subparts[1])) {
+                    $this->themeMap[trim($subparts[0])] = $subparts[1];
+                }
+            }
+        }
+        return $this->themeMap;
+    }
+
+    /**
      * Support method for init() -- figure out which theme option is active.
      *
      * @param Request $request Request object (for obtaining user parameters);
@@ -198,95 +234,102 @@ class Initializer
      */
     protected function pickTheme(?Request $request)
     {
-        // Load standard configuration options:
-        $standardTheme = $this->config->theme;
-        if (PHP_SAPI == 'cli') {
-            return $standardTheme;
+        // The admin theme should always be picked if
+        // - the Admin module is enabled AND
+        // - an admin theme is set AND
+        // - an admin route is requested (route configuration has an
+        //   'admin_route' => true default parameter).
+        if (
+            isset($this->event)
+            && ($routeMatch = $this->event->getRouteMatch())
+            && $routeMatch->getParam('admin_route')
+            && ($this->config->admin_enabled ?? false)
+            && ($adminTheme = ($this->config->admin_theme ?? false))
+        ) {
+            return $adminTheme;
         }
-        $mobileTheme = $this->mobile->enabled()
-            ? $this->config->mobile_theme : false;
+
+        // Load standard configuration options:
+        $themes = $this->getThemeAliasMap();
+        if (PHP_SAPI == 'cli') {
+            return $themes['standard'];
+        }
 
         // Find out if the user has a saved preference in the POST, URL or cookies:
+        $selectedUI = null;
         if (isset($request)) {
-            $selectedUI = $request->getPost()->get(
-                'ui', $request->getQuery()->get(
-                    'ui', isset($request->getCookie()->ui)
-                    ? $request->getCookie()->ui : null
-                )
-            );
+            $selectedUI = $request->getPost()->get('ui')
+                ?? $request->getQuery()->get('ui')
+                ?? $request->getCookie()->ui
+                ?? null;
         }
         if (empty($selectedUI)) {
-            $selectedUI = ($mobileTheme && $this->mobile->detect())
+            $selectedUI = (isset($themes['mobile']) && $this->mobile->detect())
                 ? 'mobile' : 'standard';
         }
 
         // Save the current setting to a cookie so it persists:
         $this->cookieManager->set('ui', $selectedUI);
 
-        // Do we have a valid mobile selection?
-        if ($mobileTheme && $selectedUI == 'mobile') {
-            return $mobileTheme;
-        }
-
-        // Do we have a non-standard selection?
-        if ($selectedUI != 'standard'
-            && isset($this->config->alternate_themes)
-        ) {
-            // Check the alternate theme settings for a match:
-            $parts = explode(',', $this->config->alternate_themes);
-            foreach ($parts as $part) {
-                $subparts = explode(':', $part);
-                if ((trim($subparts[0]) == trim($selectedUI))
-                    && isset($subparts[1]) && !empty($subparts[1])
-                ) {
-                    return $subparts[1];
-                }
-            }
-        }
-
-        // If we got this far, we either have a standard option or the user chose
-        // an invalid non-standard option; either way, we need to default to the
-        // standard theme:
-        return $standardTheme;
+        // Pick the selected theme (fall back to standard if unrecognized):
+        return $themes[$selectedUI] ?? $themes['standard'];
     }
 
     /**
      * Make the theme options available to the view.
      *
+     * @param string $currentTheme Active theme
+     *
      * @return void
      */
-    protected function sendThemeOptionsToView()
+    protected function sendThemeOptionsToView($currentTheme)
     {
         // Get access to the view model:
         if (PHP_SAPI !== 'cli') {
             $viewModel = $this->serviceManager->get('ViewManager')->getViewModel();
 
             // Send down the view options:
-            $viewModel->setVariable('themeOptions', $this->getThemeOptions());
+            $viewModel->setVariable('themeOptions', $this->getThemeOptions($currentTheme));
         }
     }
 
     /**
-     * Return an array of information about user-selectable themes.  Each entry in
+     * Return an array of information about user-selectable themes. Each entry in
      * the array is an associative array with 'name', 'desc' and 'selected' keys.
+     *
+     * @param string $currentTheme Active theme
      *
      * @return array
      */
-    protected function getThemeOptions()
+    protected function getThemeOptions($currentTheme)
     {
         $options = [];
         if (isset($this->config->selectable_themes)) {
             $parts = explode(',', $this->config->selectable_themes);
+            $foundSelected = false;
+            $uiCookie = $this->cookieManager->get('ui');
             foreach ($parts as $part) {
                 $subparts = explode(':', $part);
                 $name = trim($subparts[0]);
                 $desc = isset($subparts[1]) ? trim($subparts[1]) : '';
                 $desc = empty($desc) ? $name : $desc;
+                // Easiest and most accurate way to pick a selected theme is to check
+                // if the name matches the current value of the ui cookie:
+                $selected = $uiCookie === $name;
+                $foundSelected = $foundSelected || $selected;
                 if (!empty($name)) {
-                    $options[] = [
-                        'name' => $name, 'desc' => $desc,
-                        'selected' => ($this->cookieManager->get('ui') == $name)
-                    ];
+                    $options[] = compact('name', 'desc', 'selected');
+                }
+            }
+            // If we have some options, but none are selected, we need to figure
+            // out which option matches the provided theme.
+            if (!empty($options) && !$foundSelected) {
+                $aliasMap = $this->getThemeAliasMap();
+                foreach ($options as $i => $currentOptions) {
+                    if ($aliasMap[$currentOptions['name']] === $currentTheme) {
+                        $options[$i]['selected'] = true;
+                        break;
+                    }
                 }
             }
         }
@@ -330,13 +373,16 @@ class Initializer
             $resources->setGenerator($this->config->generator);
         }
 
-        $lessActive = false;
-        // Find LESS activity
+        // Determine doctype and apply it:
+        $doctype = 'HTML5';
         foreach ($themes as $key => $currentThemeInfo) {
-            if (isset($currentThemeInfo['less']['active'])) {
-                $lessActive = $currentThemeInfo['less']['active'];
+            if (isset($currentThemeInfo['doctype'])) {
+                $doctype = $currentThemeInfo['doctype'];
+                break;
             }
         }
+        $loader = $this->serviceManager->get('ViewHelperManager');
+        ($loader->get('doctype'))($doctype);
 
         // Apply the loaded theme settings in reverse for proper inheritance:
         foreach ($themes as $key => $currentThemeInfo) {
@@ -348,9 +394,6 @@ class Initializer
             $templatePathStack[] = $this->tools->getBaseDir() . "/$key/templates";
 
             // Add CSS and JS dependencies:
-            if ($lessActive && isset($currentThemeInfo['less'])) {
-                $resources->addLessCss($currentThemeInfo['less']);
-            }
             if (isset($currentThemeInfo['css'])) {
                 $resources->addCss($currentThemeInfo['css']);
             }
@@ -371,7 +414,7 @@ class Initializer
 
         // Inject the path stack generated above into the resolver:
         $resolver = $this->serviceManager->get(TemplatePathStack::class);
-        $resolver->setPaths($templatePathStack);
+        $resolver->addPaths($templatePathStack);
 
         // Add theme specific language files for translation
         $this->updateTranslator($themes);
@@ -387,6 +430,7 @@ class Initializer
      */
     protected function updateTranslator($themes)
     {
+        $theme = null;
         $pathStack = [];
         foreach (array_keys($themes) as $theme) {
             $dir = APPLICATION_PATH . '/themes/' . $theme . '/languages';
@@ -419,7 +463,7 @@ class Initializer
                 // note of it:
                 $logger = $this->serviceManager->get(\VuFind\Log\Logger::class);
                 $logger->debug(
-                    'Problem loading cache: ' . get_class($e) . ' exception: '
+                    'Problem loading cache: ' . $e::class . ' exception: '
                     . $e->getMessage()
                 );
             }

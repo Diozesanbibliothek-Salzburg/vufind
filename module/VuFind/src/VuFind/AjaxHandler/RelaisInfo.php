@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Relais: Check if logged-in patron can order an item.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2018.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\AjaxHandler;
 
 use Laminas\Mvc\Controller\Plugin\Params;
@@ -51,21 +53,23 @@ class RelaisInfo extends AbstractRelaisAction
     {
         $this->disableSessionWrites();  // avoid session write timing bug
         $oclcNumber = $params->fromQuery('oclcNumber');
-        $lin = $this->user['cat_username'] ?? null;
+        $lin = $this->user?->getCatUsername();
 
         // Authenticate
         $authResponse = $this->relais->authenticatePatron($lin, true);
         $authorizationId = $authResponse->AuthorizationId ?? null;
         if ($authorizationId === null) {
             return $this->formatResponse(
-                $this->translate('Failed'), self::STATUS_HTTP_FORBIDDEN
+                $this->translate('Failed'),
+                self::STATUS_HTTP_FORBIDDEN
             );
         }
 
         $allowLoan = $authResponse->AllowLoanAddRequest ?? false;
         if ($allowLoan == false) {
             return $this->formatResponse(
-                'AllowLoan was false', self::STATUS_HTTP_ERROR
+                'AllowLoan was false',
+                self::STATUS_HTTP_ERROR
             );
         }
 

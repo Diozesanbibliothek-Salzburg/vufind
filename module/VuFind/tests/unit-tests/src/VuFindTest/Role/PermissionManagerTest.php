@@ -1,8 +1,9 @@
 <?php
+
 /**
  * PermissionManager Test Class
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
+
 namespace VuFindTest\Role;
 
 use VuFind\Role\PermissionManager;
@@ -38,33 +40,47 @@ use VuFind\Role\PermissionManager;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
-class PermissionManagerTest extends \VuFindTest\Unit\TestCase
+class PermissionManagerTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * Sample configuration with varios config options.
+     * Sample configuration with various config options.
      *
      * @var array
      */
-    protected $permissionConfig = [
+    protected array $permissionConfig = [
         'permission.all' => [
-            'permission' => "everyone"
+            'permission' => 'everyone',
         ],
         'permission.nobody' => [
-            'permission' => "nobody"
+            'permission' => 'nobody',
         ],
         'permission.empty' => [
         ],
         'permission.array' => [
-            'permission' => ['everyoneArray', 'everyoneArray2']
-        ]
+            'permission' => ['everyoneArray', 'everyoneArray2'],
+        ],
     ];
+
+    /**
+     * Test getAllConfiguredPermissions()
+     *
+     * @return void
+     */
+    public function testGetAllConfiguredPermissions(): void
+    {
+        $pm = new PermissionManager($this->permissionConfig);
+        $this->assertEquals(
+            ['everyone', 'nobody', 'everyoneArray', 'everyoneArray2'],
+            $pm->getAllConfiguredPermissions()
+        );
+    }
 
     /**
      * Test a non existent permission section
      *
      * @return void
      */
-    public function testNonExistentPermission()
+    public function testNonExistentPermission(): void
     {
         $pm = new PermissionManager($this->permissionConfig);
 
@@ -76,7 +92,7 @@ class PermissionManagerTest extends \VuFindTest\Unit\TestCase
      *
      * @return void
      */
-    public function testExistentPermission()
+    public function testExistentPermission(): void
     {
         $pm = new PermissionManager($this->permissionConfig);
 
@@ -88,7 +104,7 @@ class PermissionManagerTest extends \VuFindTest\Unit\TestCase
      *
      * @return void
      */
-    public function testExistentPermissionInArray()
+    public function testExistentPermissionInArray(): void
     {
         $pm = new PermissionManager($this->permissionConfig);
 
@@ -100,14 +116,11 @@ class PermissionManagerTest extends \VuFindTest\Unit\TestCase
      *
      * @return void
      */
-    public function testGrantedPermission()
+    public function testGrantedPermission(): void
     {
         $pm = new PermissionManager($this->permissionConfig);
-        $mockAuth = $this->getMockBuilder(\LmcRbacMvc\Service\AuthorizationService::class)
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockAuth->expects($this->any())->method('isGranted')
-            ->will($this->returnValue(true));
+        $mockAuth = $this->createMock(\LmcRbacMvc\Service\AuthorizationService::class);
+        $mockAuth->expects($this->any())->method('isGranted')->willReturn(true);
         $pm->setAuthorizationService($mockAuth);
 
         $this->assertEquals(true, $pm->isAuthorized('permission.everyone'));
@@ -121,11 +134,8 @@ class PermissionManagerTest extends \VuFindTest\Unit\TestCase
     public function testDeniedPermission()
     {
         $pm = new PermissionManager($this->permissionConfig);
-        $mockAuth = $this->getMockBuilder(\LmcRbacMvc\Service\AuthorizationService::class)
-            ->disableOriginalConstructor()
-            ->getMock();
-        $mockAuth->expects($this->any())->method('isGranted')
-            ->will($this->returnValue(false));
+        $mockAuth = $this->createMock(\LmcRbacMvc\Service\AuthorizationService::class);
+        $mockAuth->expects($this->any())->method('isGranted')->willReturn(false);
         $pm->setAuthorizationService($mockAuth);
 
         $this->assertEquals(false, $pm->isAuthorized('permission.nobody'));

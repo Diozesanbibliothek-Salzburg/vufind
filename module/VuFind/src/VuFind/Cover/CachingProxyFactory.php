@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Cover caching proxy factory.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2018.
  *
@@ -25,13 +26,16 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\Cover;
 
-use Interop\Container\ContainerInterface;
-use Interop\Container\Exception\ContainerException;
 use Laminas\ServiceManager\Exception\ServiceNotCreatedException;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Laminas\ServiceManager\Factory\FactoryInterface;
+use Psr\Container\ContainerExceptionInterface as ContainerException;
+use Psr\Container\ContainerInterface;
+
+use function is_callable;
 
 /**
  * Cover caching proxy factory.
@@ -56,21 +60,28 @@ class CachingProxyFactory implements FactoryInterface
      * @throws ServiceNotFoundException if unable to resolve the service.
      * @throws ServiceNotCreatedException if an exception is raised when
      * creating a service.
-     * @throws ContainerException if any other error occurs
+     * @throws ContainerException&\Throwable if any other error occurs
      */
-    public function __invoke(ContainerInterface $container, $requestedName,
+    public function __invoke(
+        ContainerInterface $container,
+        $requestedName,
         array $options = null
     ) {
         if (!empty($options)) {
             throw new \Exception('Unexpected options sent to factory.');
         }
-        $cacheDir = $container->get(\VuFind\Cache\Manager::class)
-            ->getCache('cover')->getOptions()->getCacheDir();
-        $client = $container->get(\VuFindHttp\HttpService::class)->createClient();
+        $cacheOptions = $container->get(\VuFind\Cache\Manager::class)
+            ->getCache('cover')->getOptions();
+        $cacheDir = is_callable([$cacheOptions, 'getCacheDir'])
+            ? $cacheOptions->getCacheDir() : null;
         $config = $container->get(\VuFind\Config\PluginManager::class)->get('config')
             ->toArray();
         $allowedHosts = isset($config['Content']['coverproxyCache'])
             ? (array)$config['Content']['coverproxyCache'] : [];
-        return new $requestedName($client, $cacheDir . '/proxy', $allowedHosts);
+        return new $requestedName(
+            $container->get(\VuFindHttp\HttpService::class)->createClient(),
+            $cacheDir === null ? null : $cacheDir . '/proxy',
+            $allowedHosts
+        );
     }
 }

@@ -1,10 +1,12 @@
 <?php
+
 /**
- * WorldCat Search Results
+ * WorldCat Search Results (legacy -- retained only for compatibility
+ * with stored searches, which will be redirected to WorldCat v2)
  *
- * PHP version 7
+ * PHP version 8
  *
- * Copyright (C) Villanova University 2011.
+ * Copyright (C) Villanova University 2011, 2022.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2,
@@ -25,10 +27,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFind\Search\WorldCat;
 
 /**
- * WorldCat Search Parameters
+ * WorldCat Search Results (legacy -- retained only for compatibility
+ * with stored searches, which will be redirected to WorldCat v2)
  *
  * @category VuFind
  * @package  Search_WorldCat
@@ -53,15 +57,7 @@ class Results extends \VuFind\Search\Base\Results
      */
     protected function performSearch()
     {
-        $query  = $this->getParams()->getQuery();
-        $limit  = $this->getParams()->getLimit();
-        $offset = $this->getStartRecord();
-        $params = $this->getParams()->getBackendParameters();
-        $collection = $this->getSearchService()
-            ->search($this->backendId, $query, $offset, $limit, $params);
-
-        $this->resultTotal = $collection->getTotal();
-        $this->results = $collection->getRecords();
+        throw new \Exception('WorldCat v1 API no longer supported.');
     }
 
     /**
@@ -74,7 +70,6 @@ class Results extends \VuFind\Search\Base\Results
      */
     public function getFacetList($filter = null)
     {
-        // No facets in WorldCat:
-        return [];
+        throw new \Exception('WorldCat v1 API no longer supported.');
     }
 }

@@ -1,8 +1,9 @@
 <?php
+
 /**
  * SRU Search Interface
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Andrew Nagy 2008.
  *
@@ -25,12 +26,15 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindSearch\Backend\SRU;
 
 use VuFind\XSLT\Processor as XSLTProcessor;
 use VuFindSearch\Backend\Exception\BackendException;
-
 use VuFindSearch\Backend\Exception\HttpErrorException;
+
+use function is_array;
+use function sprintf;
 
 /**
  * SRU Search Interface
@@ -110,7 +114,7 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
                          'startRecord' => 1,
                          'recordSchema' => 'marcxml'];
 
-        $this->debug('More Like This Query: ' . print_r($query, true));
+        $this->debug('More Like This Query: ' . $query);
 
         return $this->call('GET', $options);
     }
@@ -150,10 +154,15 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
      *
      * @return array          An array of query results
      */
-    public function sruSearch($query, $start = 1, $limit = null, $sortBy = null,
-        $schema = 'marcxml', $process = true
+    public function sruSearch(
+        $query,
+        $start = 1,
+        $limit = null,
+        $sortBy = null,
+        $schema = 'marcxml',
+        $process = true
     ) {
-        $this->debug('Query: ' . print_r($query, true));
+        $this->debug('Query: ' . $query);
 
         // Query String Parameters
         $options = ['operation' => 'searchRetrieve',
@@ -196,6 +205,7 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
      */
     protected function call($method = 'GET', $params = null, $process = true)
     {
+        $queryString = '';
         if ($params) {
             $query = ['version=' . $this->sruVersion];
             foreach ($params as $function => $value) {
@@ -212,11 +222,12 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
             $queryString = implode('&', $query);
         }
 
-        $this->debug('Connect: ' . print_r($this->host . '?' . $queryString, true));
+        $url = $this->host . '?' . $queryString;
+        $this->debug('Connect: ' . $url);
 
         // Send Request
         $this->client->resetParameters();
-        $this->client->setUri($this->host . '?' . $queryString);
+        $this->client->setUri($url);
         $result = $this->client->setMethod($method)->send();
         $this->checkForHttpError($result);
 
@@ -225,7 +236,7 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
     }
 
     /**
-     * Process an SRU response.  Returns either the raw XML string or a
+     * Process an SRU response. Returns either the raw XML string or a
      * SimpleXMLElement based on the contents of the class' raw property.
      *
      * @param string $response SRU response

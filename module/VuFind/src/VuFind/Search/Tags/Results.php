@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Tags aspect of the Search Multi-class (Results)
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,12 +26,15 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Search\Tags;
 
-use VuFind\Db\Table\Tags as TagsTable;
 use VuFind\Record\Loader;
 use VuFind\Search\Base\Results as BaseResults;
+use VuFind\Tags\TagsService;
 use VuFindSearch\Service as SearchService;
+
+use function count;
 
 /**
  * Search Tags Results
@@ -44,26 +48,21 @@ use VuFindSearch\Service as SearchService;
 class Results extends BaseResults
 {
     /**
-     * Tags table
-     *
-     * @var TagsTable
-     */
-    protected $tagsTable;
-
-    /**
      * Constructor
      *
      * @param \VuFind\Search\Base\Params $params        Object representing user
      * search parameters.
      * @param SearchService              $searchService Search service
      * @param Loader                     $recordLoader  Record loader
-     * @param TagsTable                  $tagsTable     Resource table
+     * @param TagsService                $tagsService   Tags service
      */
-    public function __construct(\VuFind\Search\Base\Params $params,
-        SearchService $searchService, Loader $recordLoader, TagsTable $tagsTable
+    public function __construct(
+        \VuFind\Search\Base\Params $params,
+        SearchService $searchService,
+        Loader $recordLoader,
+        protected TagsService $tagsService
     ) {
         parent::__construct($params, $searchService, $recordLoader);
-        $this->tagsTable = $tagsTable;
     }
 
     /**
@@ -92,8 +91,13 @@ class Results extends BaseResults
         $query = $fuzzy
             ? $this->formatFuzzyQuery($this->getParams()->getDisplayQuery())
             : $this->getParams()->getDisplayQuery();
-        $rawResults = $this->tagsTable->resourceSearch(
-            $query, null, $this->getParams()->getSort(), 0, null, $fuzzy
+        $rawResults = $this->tagsService->getResourcesMatchingTagQuery(
+            $query,
+            null,
+            $this->getParams()->getSort(),
+            0,
+            null,
+            $fuzzy
         );
 
         // How many results were there?
@@ -102,13 +106,17 @@ class Results extends BaseResults
         // Apply offset and limit if necessary!
         $limit = $this->getParams()->getLimit();
         if ($this->resultTotal > $limit) {
-            $rawResults = $this->tagsTable->resourceSearch(
-                $query, null, $this->getParams()->getSort(),
-                $this->getStartRecord() - 1, $limit, $fuzzy
+            $rawResults = $this->tagsService->getResourcesMatchingTagQuery(
+                $query,
+                null,
+                $this->getParams()->getSort(),
+                $this->getStartRecord() - 1,
+                $limit,
+                $fuzzy
             );
         }
 
-        return $rawResults->toArray();
+        return $rawResults;
     }
 
     /**

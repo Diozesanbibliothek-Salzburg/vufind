@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Console command: extend class.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,8 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Generate;
 
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -41,15 +44,12 @@ use Symfony\Component\Console\Output\OutputInterface;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'generate/extendclass',
+    description: 'Subclass generator'
+)]
 class ExtendClassCommand extends AbstractContainerAwareCommand
 {
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'generate/extendclass';
-
     /**
      * Configure the command.
      *
@@ -58,7 +58,6 @@ class ExtendClassCommand extends AbstractContainerAwareCommand
     protected function configure()
     {
         $this
-            ->setDescription('Subclass generator')
             ->setHelp('Subclasses a service, with lookup by class name.')
             ->addArgument(
                 'class_name',
@@ -93,7 +92,10 @@ class ExtendClassCommand extends AbstractContainerAwareCommand
         try {
             $this->generatorTools->setOutputInterface($output);
             $this->generatorTools->extendClass(
-                $this->container, $class, $target, $extendFactory
+                $this->container,
+                $class,
+                $target,
+                $extendFactory
             );
         } catch (\Exception $e) {
             $output->writeln($e->getMessage());

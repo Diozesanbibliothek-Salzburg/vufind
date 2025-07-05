@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Table Definition for user
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Db\Table;
 
 use Laminas\Config\Config;
@@ -70,8 +72,13 @@ class User extends Gateway
      * (optional; used for privacy mode)
      * @param string        $table   Name of database table to interface with
      */
-    public function __construct(Adapter $adapter, PluginManager $tm, $cfg,
-        ?RowGateway $rowObj, Config $config, Container $session = null,
+    public function __construct(
+        Adapter $adapter,
+        PluginManager $tm,
+        $cfg,
+        ?RowGateway $rowObj,
+        Config $config,
+        Container $session = null,
         $table = 'user'
     ) {
         $this->config = $config;
@@ -100,9 +107,9 @@ class User extends Gateway
     /**
      * Retrieve a user object from the database based on ID.
      *
-     * @param string $id ID.
+     * @param int $id ID.
      *
-     * @return UserRow
+     * @return ?UserRow
      */
     public function getById($id)
     {
@@ -114,7 +121,7 @@ class User extends Gateway
      *
      * @param string $catId Catalog ID.
      *
-     * @return UserRow
+     * @return ?UserRow
      */
     public function getByCatalogId($catId)
     {
@@ -128,11 +135,14 @@ class User extends Gateway
      * @param string $username Username to use for retrieval.
      * @param bool   $create   Should we create users that don't already exist?
      *
-     * @return UserRow
+     * @return ?UserRow
      */
     public function getByUsername($username, $create = true)
     {
-        $row = $this->select(['username' => $username])->current();
+        $callback = function ($select) use ($username) {
+            $select->where->literal('lower(username) = lower(?)', [$username]);
+        };
+        $row = $this->select($callback)->current();
         return ($create && empty($row))
             ? $this->createRowForUsername($username) : $row;
     }
@@ -142,7 +152,7 @@ class User extends Gateway
      *
      * @param string $email email to use for retrieval.
      *
-     * @return UserRow
+     * @return ?UserRow
      */
     public function getByEmail($email)
     {
@@ -170,7 +180,7 @@ class User extends Gateway
      *
      * @param string $hash User-unique hash string
      *
-     * @return mixed
+     * @return ?UserRow
      */
     public function getByVerifyHash($hash)
     {

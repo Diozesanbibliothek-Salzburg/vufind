@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Metadata view helper
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) University of Tübingen 2019.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\View\Helper\Root;
 
 /**
@@ -66,7 +68,8 @@ class Metadata extends \Laminas\View\Helper\AbstractHelper
      * @param \Laminas\Config\Config                   $config     Configuration
      * @param \Laminas\View\Helper\HeadMeta            $metaHelper Head meta helper
      */
-    public function __construct(\VuFind\MetadataVocabulary\PluginManager $pm,
+    public function __construct(
+        \VuFind\MetadataVocabulary\PluginManager $pm,
         \Laminas\Config\Config $config,
         \Laminas\View\Helper\HeadMeta $metaHelper
     ) {
@@ -99,7 +102,7 @@ class Metadata extends \Laminas\View\Helper\AbstractHelper
      * Generate all metatags for RecordDriver and add to page
      *
      * Decide which Plugins to load for the given RecordDriver
-     * dependant on configuration. (only by class name,
+     * dependent on configuration. (only by class name,
      * namespace will not be considered)
      *
      * @param \VuFind\RecordDriver\AbstractBase $driver Record driver

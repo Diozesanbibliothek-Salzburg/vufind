@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Factory for local database-driven URL shortener.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2019.
  *
@@ -25,10 +26,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\UrlShortener;
 
 use Exception;
-use Interop\Container\ContainerInterface;
+use Psr\Container\ContainerInterface;
+use VuFind\Db\Service\ShortlinksServiceInterface;
 
 /**
  * Factory for local database-driven URL shortener.
@@ -50,17 +53,19 @@ class DatabaseFactory
      *
      * @return object
      */
-    public function __invoke(ContainerInterface $container, $requestedName,
+    public function __invoke(
+        ContainerInterface $container,
+        $requestedName,
         array $options = null
     ) {
         if (!empty($options)) {
             throw new Exception('Unexpected options passed to factory.');
         }
         $router = $container->get('HttpRouter');
-        $baseUrl = $container->get('ViewRenderer')->plugin('serverurl')
-            ->__invoke($router->assemble([], ['name' => 'home']));
-        $table = $container->get(\VuFind\Db\Table\PluginManager::class)
-            ->get('shortlinks');
+        $serverUrl = $container->get('ViewRenderer')->plugin('serverurl');
+        $baseUrl = $serverUrl($router->assemble([], ['name' => 'home']));
+        $service = $container->get(\VuFind\Db\Service\PluginManager::class)
+            ->get(ShortlinksServiceInterface::class);
         $config = $container->get(\VuFind\Config\PluginManager::class)
             ->get('config');
         $salt = $config->Security->HMACkey ?? '';
@@ -68,6 +73,6 @@ class DatabaseFactory
             throw new Exception('HMACkey missing from configuration.');
         }
         $hashType = $config->Mail->url_shortener_key_type ?? 'md5';
-        return new $requestedName(rtrim($baseUrl, '/'), $table, $salt, $hashType);
+        return new $requestedName(rtrim($baseUrl, '/'), $service, $salt, $hashType);
     }
 }

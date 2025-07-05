@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Factory for Image CAPTCHA module.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,13 +26,16 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\Captcha;
 
-use Interop\Container\ContainerInterface;
-use Interop\Container\Exception\ContainerException;
 use Laminas\ServiceManager\Exception\ServiceNotCreatedException;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Laminas\ServiceManager\Factory\FactoryInterface;
+use Psr\Container\ContainerExceptionInterface as ContainerException;
+use Psr\Container\ContainerInterface;
+
+use function is_callable;
 
 /**
  * Image CAPTCHA factory.
@@ -56,20 +60,26 @@ class ImageFactory implements FactoryInterface
      * @throws ServiceNotFoundException if unable to resolve the service.
      * @throws ServiceNotCreatedException if an exception is raised when
      * creating a service.
-     * @throws ContainerException if any other error occurs
+     * @throws ContainerException&\Throwable if any other error occurs
      */
-    public function __invoke(ContainerInterface $container, $requestedName,
+    public function __invoke(
+        ContainerInterface $container,
+        $requestedName,
         array $options = null
     ) {
         if (!empty($options)) {
             throw new \Exception('Unexpected options passed to factory.');
         }
 
+        $cacheManager = $container->get(\VuFind\Cache\Manager::class);
+        $cacheOptions = $cacheManager->getCache('public')->getOptions();
+        if (!is_callable([$cacheOptions, 'getCacheDir'])) {
+            throw new \Exception('Image CAPTCHA requires access to public cache; is cache disabled?');
+        }
         $imageOptions = [
             'font' => APPLICATION_PATH
                     . '/vendor/webfontkit/open-sans/fonts/opensans-regular.ttf',
-            'imgDir' => $container->get(\VuFind\Cache\Manager::class)
-                ->getCache('public')->getOptions()->getCacheDir()
+            'imgDir' => $cacheOptions->getCacheDir(),
         ];
 
         $config = $container->get(\VuFind\Config\PluginManager::class)
@@ -94,10 +104,13 @@ class ImageFactory implements FactoryInterface
             $imageOptions['lineNoiseLevel'] = $config->Captcha->image_lineNoiseLevel;
         }
 
+        $baseUrl = rtrim(
+            ($container->get('ViewHelperManager')->get('url'))('home') ?? '',
+            '/'
+        );
         return new $requestedName(
             new \Laminas\Captcha\Image($imageOptions),
-            $container->get('ViewHelperManager')->get('url')->__invoke('home')
-                . '/cache/'
+            "$baseUrl/cache/"
         );
     }
 }

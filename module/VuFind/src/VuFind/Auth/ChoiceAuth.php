@@ -1,8 +1,9 @@
 <?php
+
 /**
  * MultiAuth Authentication plugin
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,11 +26,18 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:authentication_handlers Wiki
  */
+
 namespace VuFind\Auth;
 
 use Laminas\Http\PhpEnvironment\Request;
-use VuFind\Db\Row\User;
+use VuFind\Db\Entity\UserEntityInterface;
 use VuFind\Exception\Auth as AuthException;
+
+use function call_user_func_array;
+use function func_get_args;
+use function in_array;
+use function is_callable;
+use function strlen;
 
 /**
  * ChoiceAuth Authentication plugin
@@ -89,7 +97,7 @@ class ChoiceAuth extends AbstractBase
     }
 
     /**
-     * Validate configuration parameters.  This is a support method for getConfig(),
+     * Validate configuration parameters. This is a support method for getConfig(),
      * so the configuration MUST be accessed using $this->config; do not call
      * $this->getConfig() from within this method!
      *
@@ -98,12 +106,13 @@ class ChoiceAuth extends AbstractBase
      */
     protected function validateConfig()
     {
-        if (!isset($this->config->ChoiceAuth->choice_order)
+        if (
+            !isset($this->config->ChoiceAuth->choice_order)
             || !strlen($this->config->ChoiceAuth->choice_order)
         ) {
             throw new AuthException(
-                "One or more ChoiceAuth parameters are missing. " .
-                "Check your config.ini!"
+                'One or more ChoiceAuth parameters are missing. ' .
+                'Check your config.ini!'
             );
         }
     }
@@ -120,7 +129,8 @@ class ChoiceAuth extends AbstractBase
     {
         parent::setConfig($config);
         $this->strategies = array_map(
-            'trim', explode(',', $this->getConfig()->ChoiceAuth->choice_order)
+            'trim',
+            explode(',', $this->getConfig()->ChoiceAuth->choice_order)
         );
     }
 
@@ -151,18 +161,18 @@ class ChoiceAuth extends AbstractBase
     }
 
     /**
-     * Attempt to authenticate the current user.  Throws exception if login fails.
+     * Attempt to authenticate the current user. Throws exception if login fails.
      *
      * @param Request $request Request object containing account credentials.
      *
      * @throws AuthException
-     * @return User Object representing logged-in user.
+     * @return UserEntityInterface Object representing logged-in user.
      */
     public function authenticate($request)
     {
         try {
             return $this->proxyUserLoad($request, 'authenticate', func_get_args());
-        } catch (AuthException $e) {
+        } catch (\Exception $e) {
             // If an exception was thrown during login, we need to clear the
             // stored strategy to ensure that we display the full ChoiceAuth
             // form rather than the form for only the method that the user
@@ -178,7 +188,7 @@ class ChoiceAuth extends AbstractBase
      * @param Request $request Request object containing new account details.
      *
      * @throws AuthException
-     * @return User New user row.
+     * @return UserEntityInterface New user entity.
      */
     public function create($request)
     {
@@ -263,7 +273,7 @@ class ChoiceAuth extends AbstractBase
 
     /**
      * Get the URL to establish a session (needed when the internal VuFind login
-     * form is inadequate).  Returns false when no session initiator is needed.
+     * form is inadequate). Returns false when no session initiator is needed.
      *
      * @param string $target Full URL where external authentication strategy should
      * send user after login (some drivers may override this).
@@ -296,13 +306,23 @@ class ChoiceAuth extends AbstractBase
     }
 
     /**
+     * Username policy for a new account (e.g. minLength, maxLength)
+     *
+     * @return array
+     */
+    public function getUsernamePolicy()
+    {
+        return $this->proxyAuthMethod('getUsernamePolicy', func_get_args()) ?: [];
+    }
+
+    /**
      * Password policy for a new password (e.g. minLength, maxLength)
      *
      * @return array
      */
     public function getPasswordPolicy()
     {
-        return $this->proxyAuthMethod('getPasswordPolicy', func_get_args());
+        return $this->proxyAuthMethod('getPasswordPolicy', func_get_args()) ?: [];
     }
 
     /**
@@ -311,7 +331,7 @@ class ChoiceAuth extends AbstractBase
      * @param Request $request Request object containing password change details.
      *
      * @throws AuthException
-     * @return User New user row.
+     * @return UserEntityInterface Updated user entity.
      */
     public function updatePassword($request)
     {
@@ -380,7 +400,7 @@ class ChoiceAuth extends AbstractBase
 
     /**
      * Proxy auth method that checks the request for an active method and then
-     * loads a User object from the database (e.g. authenticate or create).
+     * loads a UserEntityInterface object from the database (e.g. authenticate or create).
      *
      * @param Request $request Request object to check.
      * @param string  $method  the method to proxy
@@ -412,16 +432,29 @@ class ChoiceAuth extends AbstractBase
     {
         // Set new strategy; fall back to old one if there is a problem:
         $defaultStrategy = $this->strategy;
-        $this->strategy = trim($request->getPost()->get('auth_method'));
-        if (empty($this->strategy)) {
-            $this->strategy = trim($request->getQuery()->get('auth_method'));
+        $this->strategy = trim($request->getPost()->get('auth_method', ''));
+        if (!$this->strategy) {
+            $this->strategy = trim($request->getQuery()->get('auth_method', ''));
         }
-        if (empty($this->strategy)) {
+        if (!$this->strategy || !in_array($this->strategy, $this->strategies)) {
             $this->strategy = $defaultStrategy;
             if (empty($this->strategy)) {
                 throw new AuthException('authentication_error_technical');
             }
         }
+    }
+
+    /**
+     * Set the active strategy
+     *
+     * @param string $strategy New strategy
+     *
+     * @return void
+     */
+    public function setStrategy($strategy)
+    {
+        $this->strategy = $strategy;
+        $this->session->auth_method = $strategy;
     }
 
     /**
@@ -444,7 +477,7 @@ class ChoiceAuth extends AbstractBase
         } catch (AuthException $e) {
             return false;
         }
-        return isset($user) && $user instanceof User;
+        return isset($user) && $user instanceof UserEntityInterface;
     }
 
     /**

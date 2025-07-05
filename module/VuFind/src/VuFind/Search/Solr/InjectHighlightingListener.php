@@ -3,7 +3,7 @@
 /**
  * Solr highlighting listener.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -26,12 +26,13 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Search\Solr;
 
 use Laminas\EventManager\EventInterface;
-
 use Laminas\EventManager\SharedEventManagerInterface;
 use VuFindSearch\Backend\BackendInterface;
+use VuFindSearch\Service;
 
 /**
  * Solr highlighting listener.
@@ -66,17 +67,26 @@ class InjectHighlightingListener
     protected $fieldList;
 
     /**
+     * Extra Solr highlighting parameters.
+     *
+     * @var array
+     */
+    protected $extraHighlightingParameters;
+
+    /**
      * Constructor.
      *
      * @param BackendInterface $backend   Backend
      * @param string           $fieldList Field(s) to highlight (hl.fl param)
+     * @param array            $extras    Extra Solr highlighting parameters
      *
      * @return void
      */
-    public function __construct(BackendInterface $backend, $fieldList = '*')
+    public function __construct(BackendInterface $backend, $fieldList = '*', $extras = [])
     {
         $this->backend = $backend;
         $this->fieldList = $fieldList;
+        $this->extraHighlightingParameters = $extras;
     }
 
     /**
@@ -88,8 +98,11 @@ class InjectHighlightingListener
      */
     public function attach(SharedEventManagerInterface $manager)
     {
-        $manager->attach('VuFind\Search', 'pre', [$this, 'onSearchPre']);
-        $manager->attach('VuFind\Search', 'post', [$this, 'onSearchPost']);
+        $manager->attach(
+            Service::class,
+            Service::EVENT_PRE,
+            [$this, 'onSearchPre']
+        );
     }
 
     /**
@@ -101,17 +114,21 @@ class InjectHighlightingListener
      */
     public function onSearchPre(EventInterface $event)
     {
-        if ($event->getParam('context') != 'search') {
+        $command = $event->getParam('command');
+        if ($command->getContext() != 'search') {
             return $event;
         }
-        $backend = $event->getTarget();
-        if ($backend === $this->backend) {
-            $params = $event->getParam('params');
-            if ($params) {
+        if ($command->getTargetIdentifier() === $this->backend->getIdentifier()) {
+            if ($params = $command->getSearchParameters()) {
                 // Set highlighting parameters unless explicitly disabled:
                 $hl = $params->get('hl');
-                if (!isset($hl[0]) || $hl[0] != 'false') {
+                if (($hl[0] ?? 'true') != 'false') {
                     $this->active = true;
+                    // Set extra parameters first so they don't override necessary
+                    // core parameters:
+                    foreach ($this->extraHighlightingParameters as $key => $val) {
+                        $params->set($key, $val);
+                    }
                     $params->set('hl', 'true');
                     $params->set('hl.simple.pre', '{{{{START_HILITE}}}}');
                     $params->set('hl.simple.post', '{{{{END_HILITE}}}}');
@@ -123,33 +140,5 @@ class InjectHighlightingListener
             }
         }
         return $event;
-    }
-
-    /**
-     * Inject highlighting results.
-     *
-     * @param EventInterface $event Event
-     *
-     * @return EventInterface
-     */
-    public function onSearchPost(EventInterface $event)
-    {
-        // Do nothing if highlighting is disabled or context is wrong
-        if (!$this->active || $event->getParam('context') != 'search') {
-            return $event;
-        }
-
-        // Inject highlighting details into record objects:
-        $backend = $event->getParam('backend');
-        if ($backend == $this->backend->getIdentifier()) {
-            $result = $event->getTarget();
-            $hlDetails = $result->getHighlighting();
-            foreach ($result->getRecords() as $record) {
-                $id = $record->getUniqueId();
-                if (isset($hlDetails[$id])) {
-                    $record->setHighlightDetails($hlDetails[$id]);
-                }
-            }
-        }
     }
 }

@@ -1,8 +1,9 @@
 <?php
+
 /**
  * ExpireSessionsCommand test.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
+
 namespace VuFindTest\Command\Util;
 
 use VuFindConsole\Command\Util\ExpireSessionsCommand;
@@ -48,11 +50,11 @@ class ExpireSessionsCommandTest extends AbstractExpireCommandTest
     protected $targetClass = ExpireSessionsCommand::class;
 
     /**
-     * Name of a valid table class to test with
+     * Name of a valid service class to test with
      *
      * @var string
      */
-    protected $validTableClass = \VuFind\Db\Table\Session::class;
+    protected $validServiceClass = \VuFind\Db\Service\SessionService::class;
 
     /**
      * Label to use for rows in help messages.

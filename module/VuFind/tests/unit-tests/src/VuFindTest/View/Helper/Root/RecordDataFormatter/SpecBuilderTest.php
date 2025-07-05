@@ -1,8 +1,9 @@
 <?php
+
 /**
  * RecordDataFormatter spec builder Test Class
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2016.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
+
 namespace VuFindTest\View\Helper\Root\RecordDataFormatter;
 
 use VuFind\View\Helper\Root\RecordDataFormatter\SpecBuilder;
@@ -38,15 +40,18 @@ use VuFind\View\Helper\Root\RecordDataFormatter\SpecBuilder;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
-class SpecBuilderTest extends \VuFindTest\Unit\ViewHelperTestCase
+class SpecBuilderTest extends \PHPUnit\Framework\TestCase
 {
+    use \VuFindTest\Feature\ViewTrait;
+
     /**
      * Test the spec builder
      *
      * @return void
      */
-    public function testBuilder()
+    public function testBuilder(): void
     {
+        // Test building a spec:
         $builder = new SpecBuilder();
         $builder->setLine('foo', 'getFoo');
         $builder->setLine('bar', 'getBar');
@@ -70,6 +75,7 @@ class SpecBuilderTest extends \VuFindTest\Unit\ViewHelperTestCase
             ],
         ];
         $this->assertEquals($expected, $builder->getArray());
+        // Test various methods of reordering the spec:
         $builder->reorderKeys(['xyzzy', 'bar']);
         $expected['xyzzy']['pos'] = 100;
         $expected['bar']['pos'] = 200;
@@ -83,5 +89,9 @@ class SpecBuilderTest extends \VuFindTest\Unit\ViewHelperTestCase
         $expected['bar']['pos'] = 400;
         $expected['foo']['pos'] = 100;
         $this->assertEquals($expected, $builder->getArray());
+        // Test that we can remove lines from the spec:
+        $builder->removeLine('bar');
+        $builder->removeLine('foo');
+        $this->assertEquals(['xyzzy' => $expected['xyzzy']], $builder->getArray());
     }
 }

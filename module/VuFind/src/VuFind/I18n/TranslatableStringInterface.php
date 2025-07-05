@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Interface for translatable strings.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) The National Library of Finland 2015.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\I18n;
 
 /**
@@ -36,7 +38,7 @@ namespace VuFind\I18n;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
-interface TranslatableStringInterface
+interface TranslatableStringInterface extends \Stringable
 {
     /**
      * Return string for display if raw value has no translation available (can be

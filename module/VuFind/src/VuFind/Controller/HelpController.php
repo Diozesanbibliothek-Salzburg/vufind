@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Home action for Help module
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -27,6 +28,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Controller;
 
 /**
@@ -50,9 +52,17 @@ class HelpController extends AbstractBase
      */
     public function homeAction()
     {
+        $topic = $this->params()->fromRoute('topic');
+        // The 'Home' check is for backward compatibility in case the legacy
+        // Help/Home route is eventually removed from the configuration. Old
+        // URLs were of the form /Help/Home?topic=x; new URLs are /Help/x.
+        if (empty($topic) || $topic === 'Home') {
+            $topic = $this->params()->fromQuery('topic');
+        }
+
         $this->layout()->setTemplate('layout/help');
         return $this->createViewModel(
-            ['topic' => $this->params()->fromQuery('topic')]
+            ['topic' => $topic]
         );
     }
 }

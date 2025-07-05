@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Factory for Util/SwitchDbHashCommand.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,13 +26,16 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Util;
 
-use Interop\Container\ContainerInterface;
-use Interop\Container\Exception\ContainerException;
 use Laminas\ServiceManager\Exception\ServiceNotCreatedException;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
 use Laminas\ServiceManager\Factory\FactoryInterface;
+use Psr\Container\ContainerExceptionInterface as ContainerException;
+use Psr\Container\ContainerInterface;
+use VuFind\Db\Service\UserCardServiceInterface;
+use VuFind\Db\Service\UserServiceInterface;
 
 /**
  * Factory for Util/SwitchDbHashCommand.
@@ -56,17 +60,21 @@ class SwitchDbHashCommandFactory implements FactoryInterface
      * @throws ServiceNotFoundException if unable to resolve the service.
      * @throws ServiceNotCreatedException if an exception is raised when
      * creating a service.
-     * @throws ContainerException if any other error occurs
+     * @throws ContainerException&\Throwable if any other error occurs
      */
-    public function __invoke(ContainerInterface $container, $requestedName,
+    public function __invoke(
+        ContainerInterface $container,
+        $requestedName,
         array $options = null
     ) {
-        $config = $container->get(\VuFind\Config\PluginManager::class)
-            ->get('config');
-        $tableManager = $container->get(\VuFind\Db\Table\PluginManager::class);
+        $config = $container->get(\VuFind\Config\PluginManager::class)->get('config');
+        $serviceManager = $container->get(\VuFind\Db\Service\PluginManager::class);
         return new $requestedName(
             $config,
-            $tableManager->get(\VuFind\Db\Table\User::class),
+            $serviceManager->get(UserServiceInterface::class),
+            $serviceManager->get(UserCardServiceInterface::class),
+            null,
+            $container->get(\VuFind\Config\PathResolver::class),
             ...($options ?? [])
         );
     }

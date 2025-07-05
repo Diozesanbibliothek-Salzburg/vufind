@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Permission provider plugin manager
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:related_records_modules Wiki
  */
+
 namespace VuFind\Role\PermissionProvider;
 
 /**
@@ -44,10 +46,12 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      * @var array
      */
     protected $aliases = [
+        'insecureCookie' => InsecureCookie::class,
         'ipRange' => IpRange::class,
         'ipRegEx' => IpRegEx::class,
         'role' => Role::class,
         'serverParam' => ServerParam::class,
+        'sessionKey' => SessionKey::class,
         'shibboleth' => Shibboleth::class,
         'user' => User::class,
         'username' => Username::class,
@@ -59,10 +63,12 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      * @var array
      */
     protected $factories = [
+        InsecureCookie::class => InsecureCookieFactory::class,
         IpRange::class => IpRangeFactory::class,
         IpRegEx::class => IpRegExFactory::class,
         Role::class => \Laminas\ServiceManager\Factory\InvokableFactory::class,
         ServerParam::class => InjectRequestFactory::class,
+        SessionKey::class => SessionKeyFactory::class,
         Shibboleth::class => ShibbolethFactory::class,
         User::class => InjectAuthorizationServiceFactory::class,
         Username::class => InjectAuthorizationServiceFactory::class,

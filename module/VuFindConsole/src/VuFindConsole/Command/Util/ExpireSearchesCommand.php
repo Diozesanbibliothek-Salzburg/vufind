@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Console command: expire searches.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,7 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Util;
+
+use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
  * Console command: expire searches.
@@ -36,6 +40,9 @@ namespace VuFindConsole\Command\Util;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'util/expire_searches'
+)]
 class ExpireSearchesCommand extends AbstractExpireCommand
 {
     /**
@@ -51,11 +58,4 @@ class ExpireSearchesCommand extends AbstractExpireCommand
      * @var string
      */
     protected $rowLabel = 'searches';
-
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'util/expire_searches';
 }

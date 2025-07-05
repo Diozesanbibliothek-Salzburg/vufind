@@ -1,8 +1,9 @@
 <?php
+
 /**
  * LayoutClass helper factory.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2018.
  *
@@ -25,13 +26,8 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
-namespace VuFind\View\Helper\Bootstrap3;
 
-use Interop\Container\ContainerInterface;
-use Interop\Container\Exception\ContainerException;
-use Laminas\ServiceManager\Exception\ServiceNotCreatedException;
-use Laminas\ServiceManager\Exception\ServiceNotFoundException;
-use Laminas\ServiceManager\Factory\FactoryInterface;
+namespace VuFind\View\Helper\Bootstrap3;
 
 /**
  * LayoutClass helper factory.
@@ -42,40 +38,6 @@ use Laminas\ServiceManager\Factory\FactoryInterface;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
-class LayoutClassFactory implements FactoryInterface
+class LayoutClassFactory extends \VuFind\View\Helper\Bootstrap5\LayoutClassFactory
 {
-    /**
-     * Create an object
-     *
-     * @param ContainerInterface $container     Service manager
-     * @param string             $requestedName Service being created
-     * @param null|array         $options       Extra options (optional)
-     *
-     * @return object
-     *
-     * @throws ServiceNotFoundException if unable to resolve the service.
-     * @throws ServiceNotCreatedException if an exception is raised when
-     * creating a service.
-     * @throws ContainerException if any other error occurs
-     */
-    public function __invoke(ContainerInterface $container, $requestedName,
-        array $options = null
-    ) {
-        if (!empty($options)) {
-            throw new \Exception('Unexpected options sent to factory.');
-        }
-        $config = $container->get(\VuFind\Config\PluginManager::class)
-            ->get('config');
-        $sidebarOnLeft = $config->Site->sidebarOnLeft ?? false;
-        $mirror = $config->Site->mirrorSidebarInRTL ?? true;
-        $offcanvas = $config->Site->offcanvas ?? false;
-        // The right-to-left setting is injected into the layout by the Bootstrapper;
-        // pull it back out here to avoid duplicate effort, then use it to apply
-        // the mirror setting appropriately.
-        $layout = $container->get('ViewManager')->getViewModel();
-        if ($layout->rtl && $mirror) {
-            $sidebarOnLeft = !$sidebarOnLeft;
-        }
-        return new $requestedName($sidebarOnLeft, $offcanvas);
-    }
 }

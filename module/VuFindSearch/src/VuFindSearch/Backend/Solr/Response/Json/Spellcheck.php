@@ -3,7 +3,7 @@
 /**
  * SOLR spellcheck information.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,11 +26,16 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
+
 namespace VuFindSearch\Backend\Solr\Response\Json;
 
 use ArrayObject;
 use Countable;
 use IteratorAggregate;
+use Traversable;
+
+use function is_array;
+use function strlen;
 
 /**
  * SOLR spellcheck information.
@@ -123,7 +128,7 @@ class Spellcheck implements IteratorAggregate, Countable
             }
         }
 
-        // Store secondary suggestions in case merge yielded non-useful
+        // Store secondary suggestions in case merge yielded useless
         // result set:
         if (!$this->secondary) {
             $this->secondary = $spellcheck;
@@ -137,9 +142,9 @@ class Spellcheck implements IteratorAggregate, Countable
     /**
      * Return aggregated iterator.
      *
-     * @return ArrayIterator
+     * @return Traversable
      */
-    public function getIterator()
+    public function getIterator(): Traversable
     {
         return $this->terms->getIterator();
     }
@@ -149,9 +154,9 @@ class Spellcheck implements IteratorAggregate, Countable
     /**
      * Return number of terms.
      *
-     * @return integer
+     * @return int
      */
-    public function count()
+    public function count(): int
     {
         return $this->terms->count();
     }

@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Language/Delete command test.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,8 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
+
 namespace VuFindTest\Command\Language;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Component\Console\Tester\CommandTester;
 use VuFind\I18n\ExtendedIniNormalizer;
 use VuFind\I18n\Translator\Loader\ExtendedIniReader;
@@ -43,7 +46,7 @@ use VuFindConsole\Command\Language\DeleteCommand;
  */
 class DeleteCommandTest extends \PHPUnit\Framework\TestCase
 {
-    use \VuFindTest\Unit\FixtureTrait;
+    use \VuFindTest\Feature\FixtureTrait;
 
     /**
      * Language fixture directory
@@ -67,7 +70,7 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
      *
      * @return void
      */
-    public function testWithoutParameters()
+    public function testWithoutParameters(): void
     {
         $this->expectException(
             \Symfony\Component\Console\Exception\RuntimeException::class
@@ -84,13 +87,27 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
     }
 
     /**
+     * Data provider for testSuccessWithMinimalParameters()
+     *
+     * @return array[]
+     */
+    public static function successWithMinimalParametersProvider(): array
+    {
+        return ['double-quoted string' => ['foo'], 'single-quoted string' => ['foo-quoted']];
+    }
+
+    /**
      * Test the simplest possible success case.
      *
+     * @param string $domain Text domain to test with.
+     *
      * @return void
+     *
+     * @dataProvider successWithMinimalParametersProvider
      */
-    public function testSuccessWithMinimalParameters()
+    public function testSuccessWithMinimalParameters(string $domain): void
     {
-        $expectedPath = realpath($this->languageFixtureDir) . '/foo/en.ini';
+        $expectedPath = realpath($this->languageFixtureDir) . '/' . $domain . '/en.ini';
         $normalizer = $this->getMockNormalizer();
         $normalizer->expects($this->once())->method('normalizeFile')
             ->with($this->equalTo($expectedPath));
@@ -101,7 +118,7 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
                 $this->equalTo('')
             );
         $commandTester = new CommandTester($command);
-        $commandTester->execute(['target' => 'foo::bar']);
+        $commandTester->execute(['target' => $domain . '::bar']);
         $this->assertEquals("Processing en.ini...\n", $commandTester->getDisplay());
         $this->assertEquals(0, $commandTester->getStatusCode());
     }
@@ -111,7 +128,7 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
      *
      * @return void
      */
-    public function testDeletingNonExistentString()
+    public function testDeletingNonExistentString(): void
     {
         $command = $this->getMockCommand();
         $commandTester = new CommandTester($command);
@@ -126,17 +143,19 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
     /**
      * Get a mock command object
      *
-     * @param ExtendedIniNormalizer $normalizer  Normalizer for .ini files
-     * @param ExtendedIniReader     $reader      Reader for .ini files
-     * @param string                $languageDir Base language file directory
-     * @param array                 $methods     Methods to mock
+     * @param ?ExtendedIniNormalizer $normalizer  Normalizer for .ini files
+     * @param ?ExtendedIniReader     $reader      Reader for .ini files
+     * @param ?string                $languageDir Base language file directory
+     * @param array                  $methods     Methods to mock
      *
-     * @return AddUsingTemplateCommand
+     * @return DeleteCommand&MockObject
      */
-    protected function getMockCommand(ExtendedIniNormalizer $normalizer = null,
-        ExtendedIniReader $reader = null, $languageDir = null,
+    protected function getMockCommand(
+        ?ExtendedIniNormalizer $normalizer = null,
+        ?ExtendedIniReader $reader = null,
+        ?string $languageDir = null,
         array $methods = ['writeFileToDisk']
-    ) {
+    ): DeleteCommand&MockObject {
         return $this->getMockBuilder(DeleteCommand::class)
             ->setConstructorArgs(
                 [
@@ -144,7 +163,7 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
                     $reader ?? $this->getMockReader(),
                     $languageDir ?? $this->languageFixtureDir,
                 ]
-            )->setMethods($methods)
+            )->onlyMethods($methods)
             ->getMock();
     }
 
@@ -153,14 +172,16 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
      *
      * @param array $methods Methods to mock
      *
-     * @return ExtendedIniNormalizer
+     * @return ExtendedIniNormalizer&MockObject
      */
-    protected function getMockNormalizer($methods = [])
+    protected function getMockNormalizer(array $methods = []): ExtendedIniNormalizer&MockObject
     {
-        return $this->getMockBuilder(ExtendedIniNormalizer::class)
-            ->disableOriginalConstructor()
-            ->setMethods($methods)
-            ->getMock();
+        $builder = $this->getMockBuilder(ExtendedIniNormalizer::class)
+            ->disableOriginalConstructor();
+        if (!empty($methods)) {
+            $builder->onlyMethods($methods);
+        }
+        return $builder->getMock();
     }
 
     /**
@@ -168,13 +189,13 @@ class DeleteCommandTest extends \PHPUnit\Framework\TestCase
      *
      * @param array $methods Methods to mock
      *
-     * @return ExtendedIniReader
+     * @return ExtendedIniReader&MockObject
      */
-    protected function getMockReader($methods = [])
+    protected function getMockReader(array $methods = []): ExtendedIniReader&MockObject
     {
         return $this->getMockBuilder(ExtendedIniReader::class)
             ->disableOriginalConstructor()
-            ->setMethods($methods)
+            ->onlyMethods($methods)
             ->getMock();
     }
 }

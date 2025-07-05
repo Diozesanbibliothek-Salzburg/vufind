@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Head script view helper (extended for VuFind's theme system)
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,9 +26,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindTheme\View\Helper;
 
 use VuFindTheme\ThemeInfo;
+
+use function array_key_exists;
 
 /**
  * Head script view helper (extended for VuFind's theme system)
@@ -37,13 +41,17 @@ use VuFindTheme\ThemeInfo;
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
+ *
+ * @method getWhitespace(string|int $indent)
+ * @method getIndent()
+ * @method getSeparator()
  */
-class HeadScript extends \Laminas\View\Helper\HeadScript
-    implements \Laminas\Log\LoggerAwareInterface
+class HeadScript extends \Laminas\View\Helper\HeadScript implements \Laminas\Log\LoggerAwareInterface
 {
     use ConcatTrait {
         getMinifiedData as getBaseMinifiedData;
     }
+    use RelativePathTrait;
     use \VuFind\Log\LoggerAwareTrait;
 
     /**
@@ -98,8 +106,8 @@ class HeadScript extends \Laminas\View\Helper\HeadScript
      */
     public function itemToString($item, $indent, $escapeStart, $escapeEnd)
     {
-        // Normalize href to account for themes:
-        if (!empty($item->attributes['src'])) {
+        // Normalize href to account for themes (if appropriate):
+        if (!empty($item->attributes['src']) && $this->isRelativePath($item->attributes['src'])) {
             $relPath = 'js/' . $item->attributes['src'];
             $details = $this->themeInfo
                 ->findContainingTheme($relPath, ThemeInfo::RETURN_ALL_DETAILS);
@@ -126,13 +134,16 @@ class HeadScript extends \Laminas\View\Helper\HeadScript
      *
      * @return void
      */
-    public function forcePrependFile($src = null, $type = 'text/javascript',
+    public function forcePrependFile(
+        $src = null,
+        $type = 'text/javascript',
         array $attrs = []
     ) {
         // Look for existing entry and remove it if found. Comparison method
         // copied from isDuplicate().
         foreach ($this->getContainer() as $offset => $item) {
-            if (($item->source === null)
+            if (
+                ($item->source === null)
                 && array_key_exists('src', $item->attributes)
                 && ($src === $item->attributes['src'])
             ) {
@@ -155,7 +166,7 @@ class HeadScript extends \Laminas\View\Helper\HeadScript
     {
         return empty($item->attributes['src'])
             || isset($item->attributes['conditional'])
-            || strpos($item->attributes['src'], '://');
+            || !$this->isRelativePath($item->attributes['src']);
     }
 
     /**
@@ -211,7 +222,7 @@ class HeadScript extends \Laminas\View\Helper\HeadScript
     {
         $data = $this->getBaseMinifiedData($details, $concatPath);
         // Play it safe by terminating a script with a semicolon
-        if (substr(trim($data), -1, 1) !== ';') {
+        if (!str_ends_with(trim($data), ';')) {
             $data .= ';';
         }
         return $data;

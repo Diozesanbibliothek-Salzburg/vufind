@@ -1,8 +1,9 @@
 <?php
+
 /**
  * VuFind dynamic role provider.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFind\Role;
 
 use LmcRbacMvc\Role\RoleProviderInterface;
@@ -49,31 +51,16 @@ class DynamicRoleProvider implements RoleProviderInterface
     protected $roles = false;
 
     /**
-     * Permission provider manager
-     *
-     * @var PermissionProviderPluginManager
-     */
-    protected $manager;
-
-    /**
-     * Configuration for determining permissions.
-     *
-     * @var array
-     */
-    protected $config;
-
-    /**
      * Constructor
      *
      * @param PermissionProvider\PluginManager $manager Permission provider manager
      * @param array                            $config  Configuration for determining
      * permissions
      */
-    public function __construct(PermissionProvider\PluginManager $manager,
-        array $config
+    public function __construct(
+        protected PermissionProvider\PluginManager $manager,
+        protected array $config
     ) {
-        $this->manager = $manager;
-        $this->config = $config;
     }
 
     /**

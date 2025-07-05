@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Abstract Relais Ajax Action
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2018.
  *
@@ -25,10 +26,11 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\AjaxHandler;
 
 use VuFind\Connection\Relais;
-use VuFind\Db\Row\User;
+use VuFind\Db\Entity\UserEntityInterface;
 use VuFind\I18n\Translator\TranslatorAwareInterface;
 use VuFind\Session\Settings as SessionSettings;
 
@@ -41,37 +43,22 @@ use VuFind\Session\Settings as SessionSettings;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
-abstract class AbstractRelaisAction extends AbstractBase
-    implements TranslatorAwareInterface
+abstract class AbstractRelaisAction extends AbstractBase implements TranslatorAwareInterface
 {
     use \VuFind\I18n\Translator\TranslatorAwareTrait;
 
     /**
-     * Relais connector
-     *
-     * @var Relais
-     */
-    protected $relais;
-
-    /**
-     * Logged-in user (or null if none)
-     *
-     * @var User
-     */
-    protected $user;
-
-    /**
      * Constructor
      *
-     * @param SessionSettings $ss     Session settings
-     * @param Relais          $relais Relais connector
-     * @param User            $user   Logged in user (or null if none)
+     * @param SessionSettings      $ss     Session settings
+     * @param Relais               $relais Relais connector
+     * @param ?UserEntityInterface $user   Logged in user (or null if none)
      */
-    public function __construct(SessionSettings $ss, Relais $relais,
-        User $user = null
+    public function __construct(
+        SessionSettings $ss,
+        protected Relais $relais,
+        protected ?UserEntityInterface $user
     ) {
         $this->sessionSettings = $ss;
-        $this->relais = $relais;
-        $this->user = $user;
     }
 }

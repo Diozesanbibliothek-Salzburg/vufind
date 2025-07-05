@@ -3,7 +3,7 @@
 /**
  * Abstract base class for session handler test cases.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2019.
  *
@@ -26,8 +26,11 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
+
 namespace VuFindTest\Unit;
 
+use VuFind\Db\Service\ExternalSessionServiceInterface;
+use VuFind\Db\Service\SearchServiceInterface;
 use VuFind\Session\AbstractBase as SessionHandler;
 
 /**
@@ -39,7 +42,7 @@ use VuFind\Session\AbstractBase as SessionHandler;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
-abstract class SessionHandlerTestCase extends TestCase
+abstract class SessionHandlerTestCase extends \PHPUnit\Framework\TestCase
 {
     /**
      * Mock database tables.
@@ -49,6 +52,13 @@ abstract class SessionHandlerTestCase extends TestCase
     protected $tables = false;
 
     /**
+     * Mock database services.
+     *
+     * @var \VuFind\Db\Service\PluginManager
+     */
+    protected $services = false;
+
+    /**
      * Get mock database plugin manager
      *
      * @return \VuFind\Db\Table\PluginManager
@@ -56,12 +66,24 @@ abstract class SessionHandlerTestCase extends TestCase
     protected function getTables()
     {
         if (!$this->tables) {
-            $this->tables = $this
-                ->getMockBuilder(\VuFind\Db\Table\PluginManager::class)
-                ->disableOriginalConstructor()
-                ->getMock();
+            $this->tables
+                = new \VuFindTest\Container\MockDbTablePluginManager($this);
         }
         return $this->tables;
+    }
+
+    /**
+     * Get mock database service plugin manager
+     *
+     * @return \VuFind\Db\Service\PluginManager
+     */
+    protected function getServices()
+    {
+        if (!$this->services) {
+            $this->services
+                = new \VuFindTest\Container\MockDbServicePluginManager($this);
+        }
+        return $this->services;
     }
 
     /**
@@ -77,32 +99,37 @@ abstract class SessionHandlerTestCase extends TestCase
     }
 
     /**
+     * Set up mock database services for a session handler.
+     *
+     * @param SessionHandler $handler Session handler
+     *
+     * @return void
+     */
+    protected function injectMockDatabaseDependencies(SessionHandler $handler)
+    {
+        $this->injectMockDatabaseTables($handler);
+        $handler->setDbServiceManager($this->getServices());
+    }
+
+    /**
      * Set up expectations for the standard abstract handler's destroy behavior.
      *
      * @param string $sessId Session ID that we expect will be destroyed.
      *
      * @return void
      */
-    protected function setUpDestroyExpectations($sessId)
+    protected function setUpDestroyExpectations($sessId): void
     {
-        $search = $this->getMockBuilder(\VuFind\Db\Table\Search::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $search = $this->createMock(SearchServiceInterface::class);
         $search->expects($this->once())
             ->method('destroySession')
             ->with($this->equalTo($sessId));
-        $external = $this->getMockBuilder(\VuFind\Db\Table\ExternalSession::class)
-            ->disableOriginalConstructor()
-            ->getMock();
+        $external = $this->createMock(ExternalSessionServiceInterface::class);
         $external->expects($this->once())
             ->method('destroySession')
             ->with($this->equalTo($sessId));
-        $tables = $this->getTables();
-        $tables->expects($this->at(0))->method('get')
-            ->with($this->equalTo('Search'))
-            ->will($this->returnValue($search));
-        $tables->expects($this->at(1))->method('get')
-            ->with($this->equalTo('ExternalSession'))
-            ->will($this->returnValue($external));
+        $services = $this->getServices();
+        $services->set(SearchServiceInterface::class, $search);
+        $services->set(ExternalSessionServiceInterface::class, $external);
     }
 }

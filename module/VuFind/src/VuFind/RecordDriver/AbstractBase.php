@@ -1,10 +1,11 @@
 <?php
+
 /**
  * Abstract base record model.
  *
- * PHP version 7
+ * PHP version 8
  *
- * Copyright (C) Villanova University 2010.
+ * Copyright (C) Villanova University 2010-2024.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2,
@@ -25,9 +26,15 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFind\RecordDriver;
 
+use VuFind\Db\Service\CommentsServiceInterface;
+use VuFind\Db\Service\TagServiceInterface;
+use VuFind\Db\Service\UserListServiceInterface;
 use VuFind\XSLT\Import\VuFind as ArticleStripper;
+
+use function is_callable;
 
 /**
  * Abstract base record model.
@@ -40,19 +47,16 @@ use VuFind\XSLT\Import\VuFind as ArticleStripper;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
-abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
+abstract class AbstractBase implements
+    \VuFind\Db\Service\DbServiceAwareInterface,
+    \VuFind\Db\Table\DbTableAwareInterface,
     \VuFind\I18n\Translator\TranslatorAwareInterface,
     \VuFindSearch\Response\RecordInterface
 {
+    use \VuFind\Db\Service\DbServiceAwareTrait;
     use \VuFind\Db\Table\DbTableAwareTrait;
     use \VuFind\I18n\Translator\TranslatorAwareTrait;
-
-    /**
-     * Used for identifying search backends
-     *
-     * @var string
-     */
-    protected $sourceIdentifier = 'Solr';
+    use \VuFindSearch\Response\RecordTrait;
 
     /**
      * For storing extra data with record
@@ -83,6 +87,13 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
     protected $fields = [];
 
     /**
+     * Cache for rating data
+     *
+     * @var array
+     */
+    protected $ratingCache = [];
+
+    /**
      * Constructor
      *
      * @param \Laminas\Config\Config $mainConfig   VuFind main configuration (omit
@@ -93,7 +104,7 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
     public function __construct($mainConfig = null, $recordConfig = null)
     {
         $this->mainConfig = $mainConfig;
-        $this->recordConfig = (null === $recordConfig) ? $mainConfig : $recordConfig;
+        $this->recordConfig = $recordConfig ?? $mainConfig;
     }
 
     /**
@@ -101,7 +112,7 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
      *
      * @param mixed $data Raw data representing the record; Record Model
      * objects are normally constructed by Record Driver objects using data
-     * passed in from a Search Results object.  The exact nature of the data may
+     * passed in from a Search Results object. The exact nature of the data may
      * vary depending on the data source -- the important thing is that the
      * Record Driver + Search Results objects work together correctly.
      *
@@ -142,12 +153,14 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
      * Get comments associated with this record.
      *
      * @return array
+     *
+     * @deprecated Use CommentsServiceInterface::getRecordComments()
      */
     public function getComments()
     {
-        $table = $this->getDbTable('Comments');
-        return $table->getForResource(
-            $this->getUniqueId(), $this->getSourceIdentifier()
+        return $this->getDbService(CommentsServiceInterface::class)->getRecordComments(
+            $this->getUniqueId(),
+            $this->getSourceIdentifier()
         );
     }
 
@@ -174,31 +187,43 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
      * @param int    $ownerId ID of user to check for ownership
      *
      * @return array
+     *
+     * @deprecated Use TagServiceInterface::getRecordTags() or TagServiceInterface::getRecordTagsFromFavorites()
+     * or TagServiceInterface::getRecordTagsNotInFavorites()
      */
-    public function getTags($list_id = null, $user_id = null, $sort = 'count',
+    public function getTags(
+        $list_id = null,
+        $user_id = null,
+        $sort = 'count',
         $ownerId = null
     ) {
-        $tags = $this->getDbTable('Tags');
-        return $tags->getForResource(
+        return $this->getDbTable('Tags')->getForResource(
             $this->getUniqueId(),
             $this->getSourceIdentifier(),
-            0, $list_id, $user_id, $sort, $ownerId
+            0,
+            $list_id,
+            $user_id,
+            $sort,
+            $ownerId
         );
     }
 
     /**
      * Add tags to the record.
      *
-     * @param \VuFind\Db\Row\User $user The user posting the tag
+     * @param UserEntityInterface $user The user posting the tag
      * @param array               $tags The user-provided tags
      *
      * @return void
+     *
+     * @deprecated Use \VuFind\Tags\TagsService::linkTagsToRecord()
      */
     public function addTags($user, $tags)
     {
         $resources = $this->getDbTable('Resource');
         $resource = $resources->findResource(
-            $this->getUniqueId(), $this->getSourceIdentifier()
+            $this->getUniqueId(),
+            $this->getSourceIdentifier()
         );
         foreach ($tags as $tag) {
             $resource->addTag($tag, $user);
@@ -208,20 +233,103 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
     /**
      * Remove tags from the record.
      *
-     * @param \VuFind\Db\Row\User $user The user posting the tag
+     * @param UserEntityInterface $user The user posting the tag
      * @param array               $tags The user-provided tags
      *
      * @return void
+     *
+     * @deprecated Use \VuFind\Tags\TagsService::unlinkTagsFromRecord()
      */
     public function deleteTags($user, $tags)
     {
         $resources = $this->getDbTable('Resource');
         $resource = $resources->findResource(
-            $this->getUniqueId(), $this->getSourceIdentifier()
+            $this->getUniqueId(),
+            $this->getSourceIdentifier()
         );
         foreach ($tags as $tag) {
             $resource->deleteTag($tag, $user);
         }
+    }
+
+    /**
+     * Get rating information for this record.
+     *
+     * Returns an array with the following keys:
+     *
+     * rating - average rating (0-100)
+     * count  - count of ratings
+     *
+     * @param ?int $userId User ID, or null for all users
+     *
+     * @return array
+     *
+     * @deprecated Use \VuFind\Ratings\RatingsService::getRatingData()
+     */
+    public function getRatingData(?int $userId = null)
+    {
+        // Cache data since comments list may ask for same information repeatedly:
+        $cacheKey = $userId ?? '-';
+        if (!isset($this->ratingCache[$cacheKey])) {
+            $ratingsService = $this->getDbService(
+                \VuFind\Db\Service\RatingsServiceInterface::class
+            );
+            $this->ratingCache[$cacheKey] = $ratingsService->getRecordRatings(
+                $this->getUniqueId(),
+                $this->getSourceIdentifier(),
+                $userId
+            );
+        }
+        return $this->ratingCache[$cacheKey];
+    }
+
+    /**
+     * Get rating breakdown for this record.
+     *
+     * Returns an array with the following keys:
+     *
+     * rating - average rating (0-100)
+     * count  - count of ratings
+     * groups - grouped counts
+     *
+     * @param array $groups Group definition (key => [min, max])
+     *
+     * @return array
+     *
+     * @deprecated Use \VuFind\Ratings\RatingsService::getRatingBreakdown()
+     */
+    public function getRatingBreakdown(array $groups)
+    {
+        return $this->getDbService(\VuFind\Db\Service\RatingsServiceInterface::class)
+            ->getCountsForRecord(
+                $this->getUniqueId(),
+                $this->getSourceIdentifier(),
+                $groups
+            );
+    }
+
+    /**
+     * Add or update user's rating for the record.
+     *
+     * @param int  $userId ID of the user posting the rating
+     * @param ?int $rating The user-provided rating, or null to clear any existing
+     * rating
+     *
+     * @return void
+     *
+     * @deprecated Use \VuFind\Ratings\RatingsService::saveRating()
+     */
+    public function addOrUpdateRating(int $userId, ?int $rating): void
+    {
+        // Clear rating cache:
+        $this->ratingCache = [];
+        $resources = $this->getDbTable('Resource');
+        $resource = $resources->findResource(
+            $this->getUniqueId(),
+            $this->getSourceIdentifier()
+        );
+        $this->getDbService(\VuFind\Db\Service\RatingsServiceInterface::class)
+            ->addOrUpdateRating($resource, $userId, $rating);
     }
 
     /**
@@ -231,12 +339,17 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
      * @param int $user_id ID of user to load tags from (null for all users)
      *
      * @return array
+     *
+     * @deprecated Use \VuFind\View\Helper\Root\Record::getListNotes()
      */
     public function getListNotes($list_id = null, $user_id = null)
     {
         $db = $this->getDbTable('UserResource');
         $data = $db->getSavedData(
-            $this->getUniqueId(), $this->getSourceIdentifier(), $list_id, $user_id
+            $this->getUniqueId(),
+            $this->getSourceIdentifier(),
+            $list_id,
+            $user_id
         );
         $notes = [];
         foreach ($data as $current) {
@@ -253,35 +366,16 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
      * @param int $user_id ID of user to load tags from (null for all users)
      *
      * @return array
+     *
+     * @deprecated Use UserListServiceInterface::getListsContainingRecord()
      */
     public function getContainingLists($user_id = null)
     {
-        $table = $this->getDbTable('UserList');
-        return $table->getListsContainingResource(
-            $this->getUniqueId(), $this->getSourceIdentifier(), $user_id
+        return $this->getDbService(UserListServiceInterface::class)->getListsContainingRecord(
+            $this->getUniqueId(),
+            $this->getSourceIdentifier(),
+            $user_id
         );
-    }
-
-    /**
-     * Set the source backend identifier.
-     *
-     * @param string $identifier Backend identifier
-     *
-     * @return void
-     */
-    public function setSourceIdentifier($identifier)
-    {
-        $this->sourceIdentifier = $identifier;
-    }
-
-    /**
-     * Return the source backend identifier.
-     *
-     * @return string
-     */
-    public function getSourceIdentifier()
-    {
-        return $this->sourceIdentifier;
     }
 
     /**
@@ -312,6 +406,16 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
     public function supportsCoinsOpenUrl()
     {
         return true;
+    }
+
+    /**
+     * Check if rating the record is allowed.
+     *
+     * @return bool
+     */
+    public function isRatingAllowed(): bool
+    {
+        return !empty($this->recordConfig->Social->rating);
     }
 
     /**
@@ -353,7 +457,7 @@ abstract class AbstractBase implements \VuFind\Db\Table\DbTableAwareInterface,
 
     /**
      * Get an array of strings representing citation formats supported
-     * by this record's data (empty if none).  For possible legal values,
+     * by this record's data (empty if none). For possible legal values,
      * see /application/themes/root/helpers/Citation.php.
      *
      * @return array Strings representing citation formats.

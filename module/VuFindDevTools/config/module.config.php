@@ -1,4 +1,5 @@
 <?php
+
 namespace VuFindLocalTemplate\Module\Configuration;
 
 $config = [
@@ -19,18 +20,28 @@ $config = [
                     'defaults' => [
                         'controller' => 'DevTools',
                         'action'     => 'Deminify',
-                    ]
-                ]
+                    ],
+                ],
             ],
             'devtools-home' => [
-                'type' => 'Laminas\Router\Http\Literal',
+                'type' => 'Laminas\Router\Http\Segment',
                 'options' => [
-                    'route'    => '/devtools/home',
+                    'route'    => '/devtools[/home]',
                     'defaults' => [
                         'controller' => 'DevTools',
                         'action'     => 'Home',
-                    ]
-                ]
+                    ],
+                ],
+            ],
+            'devtools-icon' => [
+                'type' => 'Laminas\Router\Http\Literal',
+                'options' => [
+                    'route'    => '/devtools/icon',
+                    'defaults' => [
+                        'controller' => 'DevTools',
+                        'action'     => 'Icon',
+                    ],
+                ],
             ],
             'devtools-language' => [
                 'type' => 'Laminas\Router\Http\Literal',
@@ -39,8 +50,18 @@ $config = [
                     'defaults' => [
                         'controller' => 'DevTools',
                         'action'     => 'Language',
-                    ]
-                ]
+                    ],
+                ],
+            ],
+            'devtools-permissions' => [
+                'type' => 'Laminas\Router\Http\Literal',
+                'options' => [
+                    'route'    => '/devtools/permissions',
+                    'defaults' => [
+                        'controller' => 'DevTools',
+                        'action'     => 'Permissions',
+                    ],
+                ],
             ],
         ],
     ],

@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Permission helper
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2017.
  *
@@ -26,6 +27,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     http://vufind.org/wiki/ Wiki
  */
+
 namespace VuFind\View\Helper\Root;
 
 use Laminas\View\Helper\AbstractHelper;
@@ -61,12 +63,9 @@ class Permission extends AbstractHelper
     /**
      * Constructor
      *
-     * @param PermissionsManager       $permissionManager       Manager to decide
-     *                                                          if a permission has
-     *                                                          been granted or not
-     * @param PermissionsDeniedManager $permissionDeniedManager Manager for
-     *                                                          behavior on
-     *                                                          denied permissions
+     * @param PermissionManager       $permissionManager       Manager to decide if a permission has been granted or
+     * not
+     * @param PermissionDeniedManager $permissionDeniedManager Manager for behavior on denied permissions
      */
     public function __construct(
         PermissionManager $permissionManager,
@@ -74,6 +73,18 @@ class Permission extends AbstractHelper
     ) {
         $this->permissionManager = $permissionManager;
         $this->permissionDeniedManager = $permissionDeniedManager;
+    }
+
+    /**
+     * Determine if the current user is authorized for a permission.
+     *
+     * @param string $context Name of the permission rule
+     *
+     * @return bool
+     */
+    public function isAuthorized($context)
+    {
+        return $this->permissionManager->isAuthorized($context) === true;
     }
 
     /**
@@ -116,14 +127,15 @@ class Permission extends AbstractHelper
             ->getDeniedTemplateBehavior($context);
 
         switch ($displayLogic['action'] ?? '') {
-        case 'showMessage':
-            return $this->view->transEsc($displayLogic['value']);
-        case 'showTemplate':
-            return $this->view->context($this->view)->renderInContext(
-                $displayLogic['value'], $displayLogic['params']
-            );
-        default:
-            return null;
+            case 'showMessage':
+                return $this->view->transEsc($displayLogic['value']);
+            case 'showTemplate':
+                return $this->view->context($this->view)->renderInContext(
+                    $displayLogic['value'],
+                    $displayLogic['params']
+                );
+            default:
+                return null;
         }
     }
 }

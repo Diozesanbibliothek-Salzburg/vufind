@@ -3,7 +3,7 @@
 /**
  * Simple, schema-less SOLR record.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,9 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
+
 namespace VuFindSearch\Backend\Solr\Response\Json;
 
-use VuFindSearch\Response\RecordInterface;
+use VuFindSearch\Response\JsonRecord;
 
 /**
  * Simple, schema-less SOLR record.
@@ -42,22 +43,8 @@ use VuFindSearch\Response\RecordInterface;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
-class Record implements RecordInterface
+class Record extends JsonRecord
 {
-    /**
-     * SOLR fields.
-     *
-     * @var array
-     */
-    protected $fields;
-
-    /**
-     * Source identifier.
-     *
-     * @var string
-     */
-    protected $source;
-
     /**
      * Constructor.
      *
@@ -67,40 +54,6 @@ class Record implements RecordInterface
      */
     public function __construct(array $fields)
     {
-        $this->fields = $fields;
-    }
-
-    /**
-     * Set the source backend identifier.
-     *
-     * @param string $identifier Backend identifier
-     *
-     * @return void
-     */
-    public function setSourceIdentifier($identifier)
-    {
-        $this->source = $identifier;
-    }
-
-    /**
-     * Return the source backend identifier.
-     *
-     * @return string
-     */
-    public function getSourceIdentifier()
-    {
-        return $this->source;
-    }
-
-    /**
-     * __get()
-     *
-     * @param string $name Field name
-     *
-     * @return mixed
-     */
-    public function __get($name)
-    {
-        return $this->fields[$name] ?? null;
+        parent::__construct($fields, 'Solr');
     }
 }

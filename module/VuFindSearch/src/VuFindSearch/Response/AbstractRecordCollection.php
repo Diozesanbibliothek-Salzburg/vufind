@@ -3,7 +3,7 @@
 /**
  * Abstract record collection (implements some shared low-level functionality).
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
+
 namespace VuFindSearch\Response;
+
+use function array_slice;
+use function count;
+use function in_array;
 
 /**
  * Abstract record collection (implements some shared low-level functionality).
@@ -80,6 +85,9 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     /**
      * Return any errors.
      *
+     * Each error can be a translatable string or an array that the Flashmessages
+     * view helper understands.
+     *
      * @return array
      */
     public function getErrors()
@@ -95,6 +103,23 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     public function shuffle()
     {
         return shuffle($this->records);
+    }
+
+    /**
+     * Slice the record list.
+     *
+     * @param int $offset Offset
+     * @param int $limit  Limit
+     *
+     * @return void
+     */
+    public function slice(int $offset, int $limit): void
+    {
+        $this->records = array_slice(
+            $this->records,
+            $offset,
+            $limit
+        );
     }
 
     /**
@@ -123,12 +148,34 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      * @param string $identifier Backend identifier
      *
      * @return void
+     *
+     * @deprecated Use setSourceIdentifiers instead
      */
     public function setSourceIdentifier($identifier)
     {
         $this->source = $identifier;
         foreach ($this->records as $record) {
             $record->setSourceIdentifier($identifier);
+        }
+    }
+
+    /**
+     * Set the source backend identifiers.
+     *
+     * @param string $recordSourceId  Record source identifier
+     * @param string $searchBackendId Search backend identifier (if different from
+     * $recordSourceId)
+     *
+     * @return void
+     */
+    public function setSourceIdentifiers($recordSourceId, $searchBackendId = '')
+    {
+        $this->source = $searchBackendId ?: $recordSourceId;
+        foreach ($this->records as $record) {
+            $record->setSourceIdentifiers(
+                $recordSourceId,
+                $this->source
+            );
         }
     }
 
@@ -140,6 +187,23 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
     public function getSourceIdentifier()
     {
         return $this->source;
+    }
+
+    /**
+     * Sets the result set identifier for all records in the collection.
+     *
+     * This method assigns a given UUID to each record in the collection by calling
+     * the `setResultSetIdentifier` method on each record.
+     *
+     * @param string $uuid A valid UUID to be assigned to each record in the collection.
+     *
+     * @return void
+     */
+    public function setResultSetIdentifier(string $uuid)
+    {
+        foreach ($this->records as $record) {
+            $record->setResultSetIdentifier($uuid);
+        }
     }
 
     /**
@@ -194,7 +258,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      *
      * @return bool
      */
-    public function valid()
+    public function valid(): bool
     {
         return isset($this->records[$this->pointer]);
     }
@@ -204,7 +268,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      *
      * @return RecordInterface
      */
-    public function current()
+    public function current(): mixed
     {
         return $this->records[$this->pointer];
     }
@@ -214,7 +278,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      *
      * @return void
      */
-    public function rewind()
+    public function rewind(): void
     {
         $this->pointer = 0;
     }
@@ -224,7 +288,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      *
      * @return void
      */
-    public function next()
+    public function next(): void
     {
         $this->pointer++;
     }
@@ -234,7 +298,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      *
      * @return integer
      */
-    public function key()
+    public function key(): mixed
     {
         return $this->pointer + $this->getOffset();
     }
@@ -246,7 +310,7 @@ abstract class AbstractRecordCollection implements RecordCollectionInterface
      *
      * @return integer
      */
-    public function count()
+    public function count(): int
     {
         return count($this->records);
     }

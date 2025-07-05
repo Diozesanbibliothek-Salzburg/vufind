@@ -1,8 +1,9 @@
 <?php
+
 /**
  * VuFind Admin Controller Base
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFindAdmin\Controller;
 
 use Laminas\Mvc\MvcEvent;
@@ -74,8 +76,7 @@ class AbstractAdmin extends \VuFind\Controller\AbstractBase
         // Block access to everyone when module is disabled:
         $config = $this->getConfig();
         if (!isset($config->Site->admin_enabled) || !$config->Site->admin_enabled) {
-            $pluginManager  = $this->serviceLocator
-                ->get(\Laminas\Mvc\Controller\PluginManager::class);
+            $pluginManager  = $this->getService(\Laminas\Mvc\Controller\PluginManager::class);
             $redirectPlugin = $pluginManager->get('redirect');
             return $redirectPlugin->toRoute('admin/disabled');
         }

@@ -3,7 +3,7 @@
 /**
  * Unit tests for Summon record collection factory
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -26,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
+
 namespace VuFindTest\Backend\Summon\Response;
 
 use PHPUnit\Framework\TestCase;
@@ -52,7 +53,7 @@ class RecordCollectionFactoryTest extends TestCase
         $this->expectException(\VuFindSearch\Exception\InvalidArgumentException::class);
         $this->expectExceptionMessage('Record factory must be callable.');
 
-        $factory = new RecordCollectionFactory(12345);
+        new RecordCollectionFactory(12345);
     }
 
     /**

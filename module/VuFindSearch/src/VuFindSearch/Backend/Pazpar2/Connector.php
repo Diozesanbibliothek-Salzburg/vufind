@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Central class for connecting to Pazpar2 resources used by VuFind.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -25,13 +26,15 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:architecture Wiki
  */
+
 namespace VuFindSearch\Backend\Pazpar2;
 
 use Laminas\Http\Client;
 use Laminas\Http\Request;
 use VuFindSearch\Backend\Exception\HttpErrorException;
-
 use VuFindSearch\ParamBag;
+
+use function sprintf;
 
 /**
  * Central class for connecting to resources used by VuFind.
@@ -116,7 +119,7 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
      */
     protected function query($command, ParamBag $data = null)
     {
-        // If we don't have a session as long as we're not being explict
+        // If we don't have a session as long as we're not being explicit
         if (!$this->session && $command !== 'init') {
             $this->init();
         }
@@ -135,7 +138,8 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
         $xml = simplexml_load_string($xmlStr);
 
         // If our session has expired, start a new session
-        if ($command !== 'init'
+        if (
+            $command !== 'init'
             && $xml->session == $this->session && isset($this->session)
         ) {
             $this->init();
@@ -168,9 +172,11 @@ class Connector implements \Laminas\Log\LoggerAwareInterface
 
         $this->debug(
             sprintf(
-                '<= %s %s', $response->getStatusCode(),
+                '<= %s %s',
+                $response->getStatusCode(),
                 $response->getReasonPhrase()
-            ), ['time' => $time]
+            ),
+            ['time' => $time]
         );
 
         if (!$response->isSuccess()) {

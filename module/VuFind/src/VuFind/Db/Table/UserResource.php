@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Table Definition for user_resource
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,12 +26,17 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFind\Db\Table;
 
 use Laminas\Db\Adapter\Adapter;
 use Laminas\Db\Sql\Expression;
 use Laminas\Db\Sql\Select;
 use VuFind\Db\Row\RowGateway;
+use VuFind\Db\Service\DbServiceAwareInterface;
+use VuFind\Db\Service\DbServiceAwareTrait;
+use VuFind\Db\Service\ResourceTagsServiceInterface;
+use VuFind\Db\Service\UserResourceServiceInterface;
 
 /**
  * Table Definition for user_resource
@@ -41,8 +47,10 @@ use VuFind\Db\Row\RowGateway;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
-class UserResource extends Gateway
+class UserResource extends Gateway implements DbServiceAwareInterface
 {
+    use DbServiceAwareTrait;
+
     /**
      * Constructor
      *
@@ -52,8 +60,12 @@ class UserResource extends Gateway
      * @param RowGateway    $rowObj  Row prototype object (null for default)
      * @param string        $table   Name of database table to interface with
      */
-    public function __construct(Adapter $adapter, PluginManager $tm, $cfg,
-        ?RowGateway $rowObj = null, $table = 'user_resource'
+    public function __construct(
+        Adapter $adapter,
+        PluginManager $tm,
+        $cfg,
+        ?RowGateway $rowObj = null,
+        $table = 'user_resource'
     ) {
         parent::__construct($adapter, $tm, $cfg, $rowObj, $table);
     }
@@ -70,20 +82,25 @@ class UserResource extends Gateway
      *
      * @return \Laminas\Db\ResultSet\AbstractResultSet
      */
-    public function getSavedData($resourceId, $source = DEFAULT_SEARCH_BACKEND,
-        $listId = null, $userId = null
+    public function getSavedData(
+        $resourceId,
+        $source = DEFAULT_SEARCH_BACKEND,
+        $listId = null,
+        $userId = null
     ) {
         $callback = function ($select) use ($resourceId, $source, $listId, $userId) {
             $select->columns(
                 [
                     new Expression(
-                        'DISTINCT(?)', ['user_resource.id'],
+                        'DISTINCT(?)',
+                        ['user_resource.id'],
                         [Expression::TYPE_IDENTIFIER]
-                    ), Select::SQL_STAR
+                    ), Select::SQL_STAR,
                 ]
             );
             $select->join(
-                ['r' => 'resource'], 'r.id = user_resource.resource_id',
+                ['r' => 'resource'],
+                'r.id = user_resource.resource_id',
                 []
             );
             $select->join(
@@ -113,32 +130,21 @@ class UserResource extends Gateway
      * @param string $notes       Notes to associate with link
      *
      * @return \VuFind\Db\Row\UserResource
+     *
+     * @deprecated Use UserResourceServiceInterface::createOrUpdateLink()
      */
-    public function createOrUpdateLink($resource_id, $user_id, $list_id,
+    public function createOrUpdateLink(
+        $resource_id,
+        $user_id,
+        $list_id,
         $notes = ''
     ) {
-        $params = [
-            'resource_id' => $resource_id, 'list_id' => $list_id,
-            'user_id' => $user_id
-        ];
-        $result = $this->select($params)->current();
-
-        // Only create row if it does not already exist:
-        if (empty($result)) {
-            $result = $this->createRow();
-            $result->resource_id = $resource_id;
-            $result->list_id = $list_id;
-            $result->user_id = $user_id;
-        }
-
-        // Update the notes:
-        $result->notes = $notes;
-        $result->save();
-        return $result;
+        return $this->getDbService(UserResourceServiceInterface::class)
+            ->createOrUpdateLink($resource_id, $user_id, $list_id, $notes);
     }
 
     /**
-     * Unlink rows for the specified resource.  This will also automatically remove
+     * Unlink rows for the specified resource. This will also automatically remove
      * any tags associated with the relationship.
      *
      * @param string|array $resource_id ID (or array of IDs) of resource(s) to
@@ -150,26 +156,29 @@ class UserResource extends Gateway
      * any tags associated with the $resource_id independently of lists)
      *
      * @return void
+     *
+     * @deprecated
      */
     public function destroyLinks($resource_id, $user_id, $list_id = null)
     {
         // Remove any tags associated with the links we are removing; we don't
         // want to leave orphaned tags in the resource_tags table after we have
         // cleared out favorites in user_resource!
-        $resourceTags = $this->getDbTable('ResourceTags');
-        $resourceTags->destroyResourceLinks($resource_id, $user_id, $list_id);
+        $resourceTagsService = $this->getDbService(ResourceTagsServiceInterface::class);
+        if ($list_id === true) {
+            $resourceTagsService->destroyAllListResourceTagsLinksForUser($resource_id, $user_id);
+        } else {
+            $resourceTagsService->destroyResourceTagsLinksForUser($resource_id, $user_id, $list_id);
+        }
 
         // Now build the where clause to figure out which rows to remove:
         $callback = function ($select) use ($resource_id, $user_id, $list_id) {
             $select->where->equalTo('user_id', $user_id);
             if (null !== $resource_id) {
-                if (!is_array($resource_id)) {
-                    $resource_id = [$resource_id];
-                }
-                $select->where->in('resource_id', $resource_id);
+                $select->where->in('resource_id', (array)$resource_id);
             }
             // null or true values of $list_id have different meanings in the
-            // context of the $resourceTags->destroyResourceLinks() call above, since
+            // context of the destroyResourceTagsLinksForUser() call above, since
             // some tags have a null $list_id value. In the case of user_resource
             // rows, however, every row has a non-null $list_id value, so the
             // two cases are equivalent and may be handled identically.
@@ -193,18 +202,21 @@ class UserResource extends Gateway
         $select->columns(
             [
                 'users' => new Expression(
-                    'COUNT(DISTINCT(?))', ['user_id'],
+                    'COUNT(DISTINCT(?))',
+                    ['user_id'],
                     [Expression::TYPE_IDENTIFIER]
                 ),
                 'lists' => new Expression(
-                    'COUNT(DISTINCT(?))', ['list_id'],
+                    'COUNT(DISTINCT(?))',
+                    ['list_id'],
                     [Expression::TYPE_IDENTIFIER]
                 ),
                 'resources' => new Expression(
-                    'COUNT(DISTINCT(?))', ['resource_id'],
+                    'COUNT(DISTINCT(?))',
+                    ['resource_id'],
                     [Expression::TYPE_IDENTIFIER]
                 ),
-                'total' => new Expression('COUNT(*)')
+                'total' => new Expression('COUNT(*)'),
             ]
         );
         $statement = $this->sql->prepareStatementForSqlObject($select);
@@ -224,20 +236,30 @@ class UserResource extends Gateway
             $select->columns(
                 [
                     'resource_id' => new Expression(
-                        'MIN(?)', ['resource_id'], [Expression::TYPE_IDENTIFIER]
+                        'MIN(?)',
+                        ['resource_id'],
+                        [Expression::TYPE_IDENTIFIER]
                     ),
                     'list_id' => new Expression(
-                        'MIN(?)', ['list_id'], [Expression::TYPE_IDENTIFIER]
+                        'MIN(?)',
+                        ['list_id'],
+                        [Expression::TYPE_IDENTIFIER]
                     ),
                     'user_id' => new Expression(
-                        'MIN(?)', ['user_id'], [Expression::TYPE_IDENTIFIER]
+                        'MIN(?)',
+                        ['user_id'],
+                        [Expression::TYPE_IDENTIFIER]
                     ),
                     'cnt' => new Expression(
-                        'COUNT(?)', ['resource_id'], [Expression::TYPE_IDENTIFIER]
+                        'COUNT(?)',
+                        ['resource_id'],
+                        [Expression::TYPE_IDENTIFIER]
                     ),
                     'id' => new Expression(
-                        'MIN(?)', ['id'], [Expression::TYPE_IDENTIFIER]
-                    )
+                        'MIN(?)',
+                        ['id'],
+                        [Expression::TYPE_IDENTIFIER]
+                    ),
                 ]
             );
             $select->group(['resource_id', 'list_id', 'user_id']);

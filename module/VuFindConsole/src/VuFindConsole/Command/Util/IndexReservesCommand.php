@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Console command: index course reserves into Solr.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,15 +26,20 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Util;
 
-use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use VuFind\Reserves\CsvReader;
 use VuFindSearch\Backend\Solr\Document\UpdateDocument;
 use VuFindSearch\Backend\Solr\Record\SerializableRecord;
+
+use function count;
+use function in_array;
+use function ini_get;
 
 /**
  * Console command: index course reserves into Solr.
@@ -44,15 +50,12 @@ use VuFindSearch\Backend\Solr\Record\SerializableRecord;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'util/index_reserves',
+    description: 'Course reserves index builder'
+)]
 class IndexReservesCommand extends AbstractSolrAndIlsCommand
 {
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'util/index_reserves';
-
     /**
      * Default delimiter for reading files
      *
@@ -82,7 +85,6 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
     protected function configure()
     {
         $this
-            ->setDescription('Course reserves index builder')
             ->setHelp(
                 'This tool populates your course reserves Solr index. If run with'
                 . ' no options, it will attempt to load data from your ILS.'
@@ -104,7 +106,7 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
                 InputOption::VALUE_REQUIRED,
                 'provides a template showing where important values can be found '
                 . "within the file.\nThe template is a comma-separated list of "
-                . "values.  Choose from:\n"
+                . "values. Choose from:\n"
                 . "BIB_ID     - bibliographic ID\n"
                 . "COURSE     - course name\n"
                 . "DEPARTMENT - department name\n"
@@ -126,9 +128,13 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
      *
      * @return UpdateDocument
      */
-    protected function buildReservesIndex($instructors, $courses, $departments,
+    protected function buildReservesIndex(
+        $instructors,
+        $courses,
+        $departments,
         $reserves
     ) {
+        $index = [];
         foreach ($reserves as $record) {
             $requiredKeysFound
                 = count(array_intersect(array_keys($record), $this->requiredKeys));
@@ -152,10 +158,12 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
                     'course_id' => $courseId,
                     'course' => $courses[$courseId] ?? '',
                     'department_id' => $departmentId,
-                    'department' => $departments[$departmentId] ?? ''
+                    'department' => $departments[$departmentId] ?? '',
                 ];
             }
-            $index[$id]['bib_id'][] = $record['BIB_ID'];
+            if (!in_array($record['BIB_ID'], $index[$id]['bib_id'])) {
+                $index[$id]['bib_id'][] = $record['BIB_ID'];
+            }
         }
 
         $updates = new UpdateDocument();
@@ -173,12 +181,14 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
      * @param array|string $files     Array of files to load (or single filename).
      * @param string       $delimiter Delimiter used by file(s).
      * @param string       $template  Template showing field positions within
-     * file(s).  Comma-separated list containing BIB_ID, INSTRUCTOR, COURSE,
-     * DEPARTMENT and/or SKIP.  Default = BIB_ID,COURSE,INSTRUCTOR,DEPARTMENT
+     * file(s). Comma-separated list containing BIB_ID, INSTRUCTOR, COURSE,
+     * DEPARTMENT and/or SKIP. Default = BIB_ID,COURSE,INSTRUCTOR,DEPARTMENT
      *
      * @return CsvReader
      */
-    protected function getCsvReader($files, string $delimiter,
+    protected function getCsvReader(
+        $files,
+        string $delimiter,
         string $template
     ): CsvReader {
         return new CsvReader($files, $delimiter, $template);
@@ -234,7 +244,8 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
 
         // Make sure we have reserves and at least one of: instructors, courses,
         // departments:
-        if ((!empty($instructors) || !empty($courses) || !empty($departments))
+        if (
+            (!empty($instructors) || !empty($courses) || !empty($departments))
             && !empty($reserves)
         ) {
             // Delete existing records
@@ -242,7 +253,10 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
 
             // Build and Save the index
             $index = $this->buildReservesIndex(
-                $instructors, $courses, $departments, $reserves
+                $instructors,
+                $courses,
+                $departments,
+                $reserves
             );
             $this->solr->save('SolrReserves', $index);
 
@@ -253,7 +267,15 @@ class IndexReservesCommand extends AbstractSolrAndIlsCommand
             $output->writeln('Successfully loaded ' . count($reserves) . ' rows.');
             return 0;
         }
-        $output->writeln('Unable to load data.');
+        $missing = array_merge(
+            empty($instructors) ? ['instructors'] : [],
+            empty($courses) ? ['courses'] : [],
+            empty($departments) ? ['departments'] : [],
+            empty($reserves) ? ['reserves'] : []
+        );
+        $output->writeln(
+            'Unable to load data. No data found for: ' . implode(', ', $missing)
+        );
         return 1;
     }
 }

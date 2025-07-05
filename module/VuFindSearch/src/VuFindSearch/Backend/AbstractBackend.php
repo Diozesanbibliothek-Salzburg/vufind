@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Abstract backend.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,12 +26,15 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
+
 namespace VuFindSearch\Backend;
 
 use Laminas\Log\LoggerAwareInterface;
+use Ramsey\Uuid\Uuid;
 use VuFindSearch\Response\RecordCollectionFactoryInterface;
-
 use VuFindSearch\Response\RecordCollectionInterface;
+
+use function count;
 
 /**
  * Abstract backend.
@@ -108,13 +112,18 @@ abstract class AbstractBackend implements BackendInterface, LoggerAwareInterface
     /**
      * Inject source identifier in record collection and all contained records.
      *
-     * @param ResponseInterface $response Response
+     * @param RecordCollectionInterface $response Response
      *
-     * @return ResponseInterface
+     * @return RecordCollectionInterface
      */
     protected function injectSourceIdentifier(RecordCollectionInterface $response)
     {
-        $response->setSourceIdentifier($this->identifier);
+        $response->setSourceIdentifiers($this->identifier);
+
+        if (count($response->getRecords()) > 0) {
+            $response->setResultSetIdentifier(Uuid::uuid4());
+        }
+
         return $response;
     }
 }

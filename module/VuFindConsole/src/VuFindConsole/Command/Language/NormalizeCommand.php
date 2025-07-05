@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Language command: normalize file or directory.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,10 +26,13 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Language;
 
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
@@ -40,15 +44,12 @@ use Symfony\Component\Console\Output\OutputInterface;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'language/normalize',
+    description: 'Language file normalizer'
+)]
 class NormalizeCommand extends AbstractCommand
 {
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'language/normalize';
-
     /**
      * Configure the command.
      *
@@ -57,13 +58,19 @@ class NormalizeCommand extends AbstractCommand
     protected function configure()
     {
         $this
-            ->setDescription('Language file normalizer')
             ->setHelp(
                 'Normalizes a file or directory of language strings'
+            )->addOption(
+                'filter',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'file name pattern to use for filtering files to process'
+                . ' (applies only if target is a directory)',
+                '??.ini|??-??.ini'
             )->addArgument(
                 'target',
                 InputArgument::REQUIRED,
-                "a file or directory to normalize"
+                'a file or directory to normalize'
             );
     }
 
@@ -78,9 +85,10 @@ class NormalizeCommand extends AbstractCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $target = $input->getArgument('target');
+        $filter = $input->getOption('filter');
 
         if (is_dir($target)) {
-            $this->normalizer->normalizeDirectory($target);
+            $this->normalizer->normalizeDirectory($target, $filter);
         } elseif (is_file($target)) {
             $this->normalizer->normalizeFile($target);
         } else {

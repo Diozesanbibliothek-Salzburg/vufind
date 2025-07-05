@@ -1,8 +1,10 @@
 <?php
+
 /**
- * WorldCat Search Options
+ * WorldCat Search Options (legacy -- retained only for compatibility
+ * with stored searches, which will be redirected to WorldCat v2)
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -25,10 +27,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFind\Search\WorldCat;
 
 /**
- * WorldCat Search Options
+ * WorldCat Search Options (legacy -- retained only for compatibility
+ * with stored searches, which will be redirected to WorldCat v2)
  *
  * @category VuFind
  * @package  Search_WorldCat
@@ -38,54 +42,6 @@ namespace VuFind\Search\WorldCat;
  */
 class Options extends \VuFind\Search\Base\Options
 {
-    /**
-     * Constructor
-     *
-     * @param \VuFind\Config\PluginManager $configLoader Config loader
-     */
-    public function __construct(\VuFind\Config\PluginManager $configLoader)
-    {
-        parent::__construct($configLoader);
-        $this->searchIni = $this->facetsIni = 'WorldCat';
-
-        // Load the configuration file:
-        $searchSettings = $configLoader->get($this->searchIni);
-
-        // Search handler setup:
-        $this->defaultHandler = 'srw.kw';
-        if (isset($searchSettings->Basic_Searches)) {
-            foreach ($searchSettings->Basic_Searches as $key => $value) {
-                $this->basicHandlers[$key] = $value;
-            }
-        }
-        if (isset($searchSettings->Advanced_Searches)) {
-            foreach ($searchSettings->Advanced_Searches as $key => $value) {
-                $this->advancedHandlers[$key] = $value;
-            }
-        }
-
-        // Load sort preferences:
-        if (isset($searchSettings->Sorting)) {
-            foreach ($searchSettings->Sorting as $key => $value) {
-                $this->sortOptions[$key] = $value;
-            }
-        }
-        if (isset($searchSettings->General->default_sort)) {
-            $this->defaultSort = $searchSettings->General->default_sort;
-        }
-        if (isset($searchSettings->DefaultSortingByType)
-            && count($searchSettings->DefaultSortingByType) > 0
-        ) {
-            foreach ($searchSettings->DefaultSortingByType as $key => $val) {
-                $this->defaultSortByHandler[$key] = $val;
-            }
-        }
-        // Load list view for result (controls AJAX embedding vs. linking)
-        if (isset($searchSettings->List->view)) {
-            $this->listviewOption = $searchSettings->List->view;
-        }
-    }
-
     /**
      * Return the route name for the search results action.
      *

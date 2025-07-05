@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Head link view helper (extended for VuFind's theme system)
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,8 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindTheme\View\Helper;
 
+use stdClass;
 use VuFindTheme\ThemeInfo;
 
 /**
@@ -37,11 +40,15 @@ use VuFindTheme\ThemeInfo;
  * @author   Demian Katz <demian.katz@villanova.edu>
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
+ *
+ * @method getWhitespace(string|int $indent)
+ * @method getIndent()
+ * @method getSeparator()
  */
-class HeadLink extends \Laminas\View\Helper\HeadLink
-    implements \Laminas\Log\LoggerAwareInterface
+class HeadLink extends \Laminas\View\Helper\HeadLink implements \Laminas\Log\LoggerAwareInterface
 {
     use ConcatTrait;
+    use RelativePathTrait;
     use \VuFind\Log\LoggerAwareTrait;
 
     /**
@@ -73,7 +80,10 @@ class HeadLink extends \Laminas\View\Helper\HeadLink
      * @param string      $nonce         Nonce from nonce generator
      * @param int         $maxImportSize Maximum imported (inlined) file size
      */
-    public function __construct(ThemeInfo $themeInfo, $plconfig = false, $nonce = '',
+    public function __construct(
+        ThemeInfo $themeInfo,
+        $plconfig = false,
+        $nonce = '',
         $maxImportSize = null
     ) {
         parent::__construct();
@@ -97,71 +107,27 @@ class HeadLink extends \Laminas\View\Helper\HeadLink
     /**
      * Create HTML link element from data item
      *
-     * @param \stdClass $item data item
+     * @param stdClass $item data item
      *
      * @return string
      */
-    public function itemToString(\stdClass $item)
+    public function itemToString(stdClass $item)
     {
-        // Normalize href to account for themes, then call the parent class:
-        $relPath = 'css/' . $item->href;
-        $details = $this->themeInfo
-            ->findContainingTheme($relPath, ThemeInfo::RETURN_ALL_DETAILS);
-
-        if (!empty($details)) {
-            $urlHelper = $this->getView()->plugin('url');
-            $url = $urlHelper('home') . "themes/{$details['theme']}/" . $relPath;
-            $url .= strstr($url, '?') ? '&_=' : '?_=';
-            $url .= filemtime($details['path']);
-            $item->href = $url;
+        // Normalize href to account for themes (if appropriate), then call the parent class:
+        if (isset($item->href) && $this->isRelativePath($item->href)) {
+            $relPath = 'css/' . $item->href;
+            $details = $this->themeInfo
+                ->findContainingTheme($relPath, ThemeInfo::RETURN_ALL_DETAILS);
+            if (!empty($details)) {
+                $urlHelper = $this->getView()->plugin('url');
+                $url = $urlHelper('home') . "themes/{$details['theme']}/" . $relPath;
+                $url .= strstr($url, '?') ? '&_=' : '?_=';
+                $url .= filemtime($details['path']);
+                $item->href = $url;
+            }
         }
         $this->addNonce($item);
         return parent::itemToString($item);
-    }
-
-    /**
-     * Compile a less file to css and add to css folder
-     *
-     * @param string $file Path to less file
-     *
-     * @return string
-     */
-    public function addLessStylesheet($file)
-    {
-        $relPath = 'less/' . $file;
-        $urlHelper = $this->getView()->plugin('url');
-        $currentTheme = $this->themeInfo->findContainingTheme($relPath);
-        $helperHome = $urlHelper('home');
-        $home = APPLICATION_PATH . '/themes/' . $currentTheme . '/';
-        $cssDirectory = $helperHome . 'themes/' . $currentTheme . '/css/less/';
-
-        try {
-            $less_files = [
-                APPLICATION_PATH . '/themes/' . $currentTheme . '/' . $relPath
-                    => $cssDirectory
-            ];
-            $themeParents = array_keys($this->themeInfo->getThemeInfo());
-            $directories = [];
-            foreach ($themeParents as $theme) {
-                $directories[APPLICATION_PATH . '/themes/' . $theme . '/less/']
-                    = $helperHome . 'themes/' . $theme . '/css/less/';
-            }
-            $css_file_name = \Less_Cache::Get(
-                $less_files,
-                [
-                    'cache_dir' => $home . 'css/less/',
-                    'cache_method' => false,
-                    'compress' => true,
-                    'import_dirs' => $directories,
-                    'output' => str_replace('.less', '.css', $file)
-                ]
-            );
-            return $cssDirectory . $css_file_name;
-        } catch (\Exception $e) {
-            error_log($e->getMessage());
-            list($fileName, ) = explode('.', $file);
-            return $urlHelper('home') . "themes/{$currentTheme}/css/{$fileName}.css";
-        }
     }
 
     /**
@@ -174,8 +140,11 @@ class HeadLink extends \Laminas\View\Helper\HeadLink
      *
      * @return void
      */
-    public function forcePrependStylesheet($href, $media = 'screen',
-        $conditionalStylesheet = '', $extras = []
+    public function forcePrependStylesheet(
+        $href,
+        $media = 'screen',
+        $conditionalStylesheet = '',
+        $extras = []
     ) {
         // Look for existing entry and remove it if found. Comparison method
         // copied from isDuplicate().
@@ -199,7 +168,7 @@ class HeadLink extends \Laminas\View\Helper\HeadLink
     protected function isExcludedFromConcat($item)
     {
         return !isset($item->rel) || $item->rel != 'stylesheet'
-            || strpos($item->href, '://');
+            || !isset($item->href) || !$this->isRelativePath($item->href);
     }
 
     /**

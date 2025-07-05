@@ -3,7 +3,7 @@
 /**
  * Factory for Pazpar2 backends.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2013.
  *
@@ -26,17 +26,13 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Search\Factory;
 
-use Interop\Container\ContainerInterface;
-
-use Laminas\ServiceManager\Factory\FactoryInterface;
-
-use VuFindHttp\HttpService;
+use Psr\Container\ContainerInterface;
 use VuFindSearch\Backend\Pazpar2\Backend;
 use VuFindSearch\Backend\Pazpar2\Connector;
 use VuFindSearch\Backend\Pazpar2\QueryBuilder;
-
 use VuFindSearch\Backend\Pazpar2\Response\RecordCollectionFactory;
 
 /**
@@ -48,7 +44,7 @@ use VuFindSearch\Backend\Pazpar2\Response\RecordCollectionFactory;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
-class Pazpar2BackendFactory implements FactoryInterface
+class Pazpar2BackendFactory extends AbstractBackendFactory
 {
     /**
      * Logger.
@@ -56,13 +52,6 @@ class Pazpar2BackendFactory implements FactoryInterface
      * @var \Laminas\Log\LoggerInterface
      */
     protected $logger;
-
-    /**
-     * Superior service manager.
-     *
-     * @var ContainerInterface
-     */
-    protected $serviceLocator;
 
     /**
      * VuFind configuration
@@ -84,12 +73,10 @@ class Pazpar2BackendFactory implements FactoryInterface
      */
     public function __invoke(ContainerInterface $sm, $name, array $options = null)
     {
-        $this->serviceLocator = $sm;
-        $this->config = $this->serviceLocator
-            ->get(\VuFind\Config\PluginManager::class)
-            ->get('Pazpar2');
+        $this->setup($sm);
+        $this->config = $this->getService(\VuFind\Config\PluginManager::class)->get('Pazpar2');
         if ($this->serviceLocator->has(\VuFind\Log\Logger::class)) {
-            $this->logger = $this->serviceLocator->get(\VuFind\Log\Logger::class);
+            $this->logger = $this->getService(\VuFind\Log\Logger::class);
         }
         $connector = $this->createConnector();
         $backend   = $this->createBackend($connector);
@@ -128,7 +115,7 @@ class Pazpar2BackendFactory implements FactoryInterface
     {
         $connector = new Connector(
             $this->config->General->base_url,
-            $this->serviceLocator->get(HttpService::class)->createClient()
+            $this->createHttpClient()
         );
         $connector->setLogger($this->logger);
         return $connector;
@@ -151,8 +138,7 @@ class Pazpar2BackendFactory implements FactoryInterface
      */
     protected function createRecordCollectionFactory()
     {
-        $manager = $this->serviceLocator
-            ->get(\VuFind\RecordDriver\PluginManager::class);
+        $manager = $this->getService(\VuFind\RecordDriver\PluginManager::class);
         $callback = function ($data) use ($manager) {
             $driver = $manager->get('Pazpar2');
             $driver->setRawData($data);

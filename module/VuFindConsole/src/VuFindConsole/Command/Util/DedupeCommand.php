@@ -1,11 +1,12 @@
 <?php
+
 /**
  * Console command: deduplicate lines in a sorted file.
  *
  * Needed for the Windows version of the alphabetical browse database generator,
  * since Windows sort does not support deduplication. Assumes presorted input.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -28,13 +29,15 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Util;
 
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
-use VuFindConsole\Command\RelativeFileAwareCommand;
 
 /**
  * Console command: deduplicate lines in a sorted file.
@@ -45,15 +48,12 @@ use VuFindConsole\Command\RelativeFileAwareCommand;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
-class DedupeCommand extends RelativeFileAwareCommand
+#[AsCommand(
+    name: 'util/dedupe',
+    description: 'Tool for deduplicating lines in a sorted file'
+)]
+class DedupeCommand extends Command
 {
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'util/dedupe';
-
     /**
      * Configure the command.
      *
@@ -62,7 +62,6 @@ class DedupeCommand extends RelativeFileAwareCommand
     protected function configure()
     {
         $this
-            ->setDescription('Tool for deduplicating lines in a sorted file')
             ->setHelp('Deduplicates lines in a sorted file.')
             ->addArgument(
                 'input',
@@ -84,7 +83,9 @@ class DedupeCommand extends RelativeFileAwareCommand
      *
      * @return string        User-entered response.
      */
-    protected function getInput(InputInterface $input, OutputInterface $output,
+    protected function getInput(
+        InputInterface $input,
+        OutputInterface $output,
         string $prompt
     ): string {
         $question = new Question($prompt, '');
@@ -113,7 +114,7 @@ class DedupeCommand extends RelativeFileAwareCommand
      */
     protected function writeToOutputFile($handle, $text)
     {
-        fputs($handle, $text);
+        fwrite($handle, $text);
     }
 
     /**

@@ -1,10 +1,13 @@
-<?=$this->doctype('XHTML1_TRANSITIONAL')?>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="<?=$this->layout()->userLang ?>" xml:lang="en">
+<?=$this->doctype()?>
+<html lang="<?=$this->layout()->userLang?>"<?php if ($this->layout()->rtl): ?> dir="rtl"<?php endif; ?>>
   <head>
-    <?php $this->headThemeResources(); ?>
+    <?php
+      $this->setupThemeResources();
+      $this->assetManager()->clearScriptList()->clearStyleList()->appendStyleLink('help.css');
+    ?>
     <?=$this->headMeta()?>
-    <?=$this->headTitle() ?>
-    <?=$this->headLink()->setStylesheet('help.css')  ?>
+    <?=$this->headTitle()?>
+    <?=$this->assetManager()->outputHeaderAssets()?>
   </head>
   <body>
     <?=$this->layout()->content?>

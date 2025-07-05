@@ -1,9 +1,10 @@
 <?php
+
 /**
  * Model for missing records -- used for saved favorites that have been deleted
  * from the index.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +27,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:record_drivers Wiki
  */
+
 namespace VuFind\RecordDriver;
+
+use VuFind\Db\Service\ResourceServiceInterface;
 
 /**
  * Model for missing records -- used for saved favorites that have been deleted
@@ -50,8 +54,8 @@ class Missing extends DefaultRecord
      */
     public function __construct($mainConfig = null, $recordConfig = null)
     {
-        $this->sourceIdentifier = 'missing';
         parent::__construct($mainConfig, $recordConfig);
+        $this->setSourceIdentifiers('missing');
     }
 
     /**
@@ -68,13 +72,11 @@ class Missing extends DefaultRecord
         }
 
         // If available, load title from database:
-        $id = $this->getUniqueId();
-        if ($id) {
-            $table = $this->getDbTable('Resource');
-            $resource = $table
-                ->findResource($id, $this->getSourceIdentifier(), false);
-            if (!empty($resource) && !empty($resource->title)) {
-                return $resource->title;
+        if ($id = $this->getUniqueID()) {
+            $resourceService = $this->getDbService(ResourceServiceInterface::class);
+            $resource = $resourceService->getResourceByRecordId($id, $this->getSourceIdentifier());
+            if ($title = $resource?->getTitle()) {
+                return $title;
             }
         }
 
@@ -102,5 +104,15 @@ class Missing extends DefaultRecord
     {
         $title = parent::getShortTitle();
         return empty($title) ? $this->determineMissingTitle() : $title;
+    }
+
+    /**
+     * Get an array of all the formats associated with the record.
+     *
+     * @return array
+     */
+    public function getFormats()
+    {
+        return ['Unknown'];
     }
 }

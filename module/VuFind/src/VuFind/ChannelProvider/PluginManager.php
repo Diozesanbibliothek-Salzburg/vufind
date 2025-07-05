@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Channel provider plugin manager
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2016.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\ChannelProvider;
 
 /**
@@ -48,6 +50,7 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
         'facets' => Facets::class,
         'listitems' => ListItems::class,
         'newilsitems' => NewILSItems::class,
+        'newsearchitems' => NewSearchItems::class,
         'random' => Random::class,
         'recentlyreturned' => RecentlyReturned::class,
         'similaritems' => SimilarItems::class,
@@ -64,6 +67,7 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
         Facets::class => FacetsFactory::class,
         ListItems::class => ListItemsFactory::class,
         NewILSItems::class => AbstractILSChannelProviderFactory::class,
+        NewSearchItems::class => NewSearchItemsFactory::class,
         Random::class => RandomFactory::class,
         RecentlyReturned::class => AbstractILSChannelProviderFactory::class,
         SimilarItems::class => SimilarItemsFactory::class,
@@ -79,7 +83,8 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      * @param array $v3config                  If $configOrContainerInstance is a
      * container, this value will be passed to the parent constructor.
      */
-    public function __construct($configOrContainerInstance = null,
+    public function __construct(
+        $configOrContainerInstance = null,
         array $v3config = []
     ) {
         $this->addInitializer(RouterInitializer::class);

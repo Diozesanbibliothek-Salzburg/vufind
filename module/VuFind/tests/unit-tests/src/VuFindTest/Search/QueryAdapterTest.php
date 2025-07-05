@@ -3,7 +3,7 @@
 /**
  * QueryAdapter unit tests.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,11 +26,14 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
+
 namespace VuFindTest\Search;
 
 use VuFind\Search\QueryAdapter;
+use VuFind\Search\QueryAdapterInterface;
 use VuFindSearch\Query\Query;
-use VuFindTest\Unit\TestCase as TestCase;
+
+use function count;
 
 /**
  * QueryAdapter unit tests.
@@ -41,28 +44,52 @@ use VuFindTest\Unit\TestCase as TestCase;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
-class QueryAdapterTest extends TestCase
+class QueryAdapterTest extends \PHPUnit\Framework\TestCase
 {
-    use \VuFindTest\Unit\FixtureTrait;
+    use \VuFindTest\Feature\FixtureTrait;
+
+    /**
+     * Data provider for testConversions
+     *
+     * @return array
+     */
+    public static function conversionsProvider(): array
+    {
+        return [
+            ['basic', true],
+            ['advanced', true],
+            ['workkeys', false],
+        ];
+    }
 
     /**
      * Test various conversions.
      *
+     * @param string $type   Search type
+     * @param bool   $legacy Whether to test legacy version deminification
+     *
+     * @dataProvider conversionsProvider
+     *
      * @return void
      */
-    public function testConversions()
+    public function testConversions(string $type, bool $legacy)
     {
-        $cases = ['basic', 'advanced'];
-        foreach ($cases as $case) {
-            // Load minified, unminified, and Query object data:
-            $min = unserialize($this->getFixture('searches/' . $case . '/min'));
-            $q = unserialize($this->getFixture('searches/' . $case . '/query'));
+        // Load minified, unminified, and Query object data:
+        $min = unserialize($this->getFixture('searches/' . $type . '/min'));
+        $q = unserialize($this->getFixture('searches/' . $type . '/query'));
 
-            // Test conversion of minified data:
-            $this->assertEquals($q, QueryAdapter::deminify($min));
+        $adapter = $this->getQueryAdapter();
 
-            // Test minification of a Query:
-            $this->assertEquals($min, QueryAdapter::minify($q));
+        // Test conversion of minified data:
+        $this->assertEquals($q, $adapter->deminify($min));
+
+        // Test minification of a Query:
+        $this->assertEquals($min, $adapter->minify($q));
+
+        if ($legacy) {
+            // Test conversion of legacy minified data:
+            $legacyMin = unserialize($this->getFixture('searches/' . $type . '/min-legacy'));
+            $this->assertEquals($q, $adapter->deminify($legacyMin));
         }
     }
 
@@ -77,7 +104,8 @@ class QueryAdapterTest extends TestCase
     public function testOperatorDefinedEverywhere()
     {
         $q = unserialize($this->getFixture('searches/operators'));
-        $minified = QueryAdapter::minify($q);
+        $adapter = $this->getQueryAdapter();
+        $minified = $adapter->minify($q);
 
         // First, check that count of 'o' values matches count of queries in group:
         $callback = function ($carry, $item) {
@@ -92,7 +120,7 @@ class QueryAdapterTest extends TestCase
         $this->assertEquals('', $minified[0]['g'][0]['o']);
 
         // Finally, make sure that we can round-trip back to the input.
-        $this->assertEquals($q, QueryAdapter::deminify($minified));
+        $this->assertEquals($q, $adapter->deminify($minified));
     }
 
     /**
@@ -104,7 +132,7 @@ class QueryAdapterTest extends TestCase
     {
         $req = unserialize($this->getFixture('searches/advanced/request'));
         $q = unserialize($this->getFixture('searches/advanced/query'));
-        $this->assertEquals($q, QueryAdapter::fromRequest($req, 'AllFields'));
+        $this->assertEquals($q, $this->getQueryAdapter()->fromRequest($req, 'AllFields'));
     }
 
     /**
@@ -115,7 +143,7 @@ class QueryAdapterTest extends TestCase
     public function testEmptyRequest()
     {
         $req = new \Laminas\Stdlib\Parameters([]);
-        $this->assertEquals(new Query(), QueryAdapter::fromRequest($req, 'AllFields'));
+        $this->assertEquals(new Query(), $this->getQueryAdapter()->fromRequest($req, 'AllFields'));
     }
 
     /**
@@ -128,7 +156,8 @@ class QueryAdapterTest extends TestCase
         // Array of fixture directory => expected display query
         $cases = [
             'basic' => 'john smith',
-            'advanced' => '(CallNumber:oranges AND toc:bananas AND ISN:pears) OR (Title:cars OR Subject:trucks) NOT ((AllFields:squid))'
+            'advanced' => '(CallNumber:oranges AND toc:bananas AND ISN:pears) OR '
+                . '(Title:cars OR Subject:trucks) NOT ((AllFields:squid))',
         ];
 
         // Create simple closure to fill in for translation callbacks:
@@ -139,7 +168,17 @@ class QueryAdapterTest extends TestCase
         // Run the tests:
         foreach ($cases as $case => $expected) {
             $q = unserialize($this->getFixture('searches/' . $case . '/query'));
-            $this->assertEquals($expected, QueryAdapter::display($q, $echo, $echo));
+            $this->assertEquals($expected, $this->getQueryAdapter()->display($q, $echo, $echo));
         }
+    }
+
+    /**
+     * Create a query adapter
+     *
+     * @return QueryAdapterInterface
+     */
+    protected function getQueryAdapter(): QueryAdapterInterface
+    {
+        return new QueryAdapter();
     }
 }

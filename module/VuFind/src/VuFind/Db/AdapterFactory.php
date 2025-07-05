@@ -1,9 +1,10 @@
 <?php
+
 /**
  * Database utility class. May be used as a service or as a standard
  * Laminas factory.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,15 +27,16 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Db;
 
-use Interop\Container\ContainerInterface;
-use Interop\Container\Exception\ContainerException;
 use Laminas\Config\Config;
 use Laminas\Db\Adapter\Adapter;
-
 use Laminas\ServiceManager\Exception\ServiceNotCreatedException;
 use Laminas\ServiceManager\Exception\ServiceNotFoundException;
+use Psr\Container\ContainerExceptionInterface as ContainerException;
+use Psr\Container\ContainerInterface;
+use VuFind\Config\Feature\SecretTrait;
 
 /**
  * Database utility class. May be used as a service or as a standard
@@ -48,6 +50,8 @@ use Laminas\ServiceManager\Exception\ServiceNotFoundException;
  */
 class AdapterFactory implements \Laminas\ServiceManager\Factory\FactoryInterface
 {
+    use SecretTrait;
+
     /**
      * VuFind configuration
      *
@@ -78,9 +82,11 @@ class AdapterFactory implements \Laminas\ServiceManager\Factory\FactoryInterface
      * @throws ServiceNotFoundException if unable to resolve the service.
      * @throws ServiceNotCreatedException if an exception is raised when
      * creating a service.
-     * @throws ContainerException if any other error occurs
+     * @throws ContainerException&\Throwable if any other error occurs
      */
-    public function __invoke(ContainerInterface $container, $requestedName,
+    public function __invoke(
+        ContainerInterface $container,
+        $requestedName,
         array $options = null
     ) {
         if (!empty($options)) {
@@ -103,13 +109,19 @@ class AdapterFactory implements \Laminas\ServiceManager\Factory\FactoryInterface
      */
     public function getAdapter($overrideUser = null, $overridePass = null)
     {
-        // Parse details from connection string:
-        if (!isset($this->config->Database->database)) {
-            throw new \Exception('"database" setting missing');
+        if (isset($this->config->Database->database)) {
+            // Parse details from connection string:
+            return $this->getAdapterFromConnectionString(
+                $this->config->Database->database,
+                $overrideUser,
+                $overridePass
+            );
+        } else {
+            return $this->getAdapterFromConfig(
+                $overrideUser,
+                $overridePass
+            );
         }
-        return $this->getAdapterFromConnectionString(
-            $this->config->Database->database, $overrideUser, $overridePass
-        );
     }
 
     /**
@@ -122,14 +134,31 @@ class AdapterFactory implements \Laminas\ServiceManager\Factory\FactoryInterface
     public function getDriverName($type)
     {
         switch (strtolower($type)) {
-        case 'mysql':
-            return 'mysqli';
-        case 'oci8':
-            return 'Oracle';
-        case 'pgsql':
-            return 'Pdo_Pgsql';
+            case 'mysql':
+                return 'mysqli';
+            case 'oci8':
+                return 'Oracle';
+            case 'pgsql':
+                return 'Pdo_Pgsql';
         }
         return $type;
+    }
+
+    /**
+     * Get options for the selected driver.
+     *
+     * @param string $driver Driver name
+     *
+     * @return array
+     */
+    protected function getDriverOptions($driver)
+    {
+        switch ($driver) {
+            case 'mysqli':
+                return ($this->config->Database->verify_server_certificate ?? false)
+                    ? [] : [MYSQLI_CLIENT_SSL_DONT_VERIFY_SERVER_CERT];
+        }
+        return [];
     }
 
     /**
@@ -144,10 +173,18 @@ class AdapterFactory implements \Laminas\ServiceManager\Factory\FactoryInterface
         // Set up custom options by database type:
         $driver = strtolower($options['driver']);
         switch ($driver) {
-        case 'mysqli':
-            $options['charset'] = $this->config->Database->charset ?? 'utf8';
-            $options['options'] = ['buffer_results' => true];
-            break;
+            case 'mysqli':
+                $options['charset'] = $this->config->Database->charset ?? 'utf8mb4';
+                if (strtolower($options['charset']) === 'latin1') {
+                    throw new \Exception(
+                        'The latin1 encoding is no longer supported for MySQL'
+                        . ' databases in VuFind. Please convert your database'
+                        . ' to utf8 using VuFind 7.x or earlier BEFORE'
+                        . ' upgrading to this version.'
+                    );
+                }
+                $options['options'] = ['buffer_results' => true];
+                break;
         }
 
         // Set up database connection:
@@ -177,40 +214,96 @@ class AdapterFactory implements \Laminas\ServiceManager\Factory\FactoryInterface
      *
      * @return Adapter
      */
-    public function getAdapterFromConnectionString($connectionString,
-        $overrideUser = null, $overridePass = null
+    public function getAdapterFromConnectionString(
+        $connectionString,
+        $overrideUser = null,
+        $overridePass = null
     ) {
-        list($type, $details) = explode('://', $connectionString);
+        [$type, $details] = explode('://', $connectionString);
         preg_match('/(.+)@([^@]+)\/(.+)/', $details, $matches);
         $credentials = $matches[1] ?? null;
+        $host = $port = null;
         if (isset($matches[2])) {
-            if (strpos($matches[2], ':') !== false) {
-                list($host, $port) = explode(':', $matches[2]);
+            if (str_contains($matches[2], ':')) {
+                [$host, $port] = explode(':', $matches[2]);
             } else {
                 $host = $matches[2];
             }
         }
         $dbName = $matches[3] ?? null;
         if (strstr($credentials, ':')) {
-            list($username, $password) = explode(':', $credentials, 2);
+            [$username, $password] = explode(':', $credentials, 2);
         } else {
             $username = $credentials;
             $password = null;
         }
-        $username = null !== $overrideUser ? $overrideUser : $username;
-        $password = null !== $overridePass ? $overridePass : $password;
+        $username = $overrideUser ?? $username;
+        $password = $overridePass ?? $password;
+
+        return $this->getAdapterFromArray([
+            'driver' => $type,
+            'hostname' => $host,
+            'username' => $username,
+            'password' => $password,
+            'database' => $dbName,
+            'use_ssl' => $this->config->Database->use_ssl ?? false,
+            'port' => $port ?? null,
+        ]);
+    }
+
+    /**
+     * Obtain a Laminas\DB connection using the config.
+     *
+     * @param string $overrideUser Username override (leave null to use username from config)
+     * @param string $overridePass Password override (leave null to use password from config)
+     *
+     * @return Adapter
+     */
+    public function getAdapterFromConfig($overrideUser = null, $overridePass = null)
+    {
+        if (!isset($this->config->Database)) {
+            throw new \Exception('[Database] Configuration section missing');
+        }
+        $config = $this->config->Database;
+        return $this->getAdapterFromArray([
+            'driver' => $config->database_driver ?? null,
+            'hostname' => $config->database_host ?? null,
+            'username' => $overrideUser ?? $config->database_username ?? null,
+            'password' => $overridePass ?? $this->getSecretFromConfig($config, 'database_password'),
+            'database' => $config->database_name,
+            'port' => $config->database_port ?? null,
+        ]);
+    }
+
+    /**
+     * Obtain a Laminas\DB connection using a set of given element.
+     *
+     * @param array $config Config array to connect to the DB containing
+     * driver (ie: mysql), username, password, hostname, database (db name), port
+     *
+     * @return Adapter
+     */
+    public function getAdapterFromArray(array $config)
+    {
+        $driverName = $this->getDriverName($config['driver']);
 
         // Set up default options:
         $options = [
-            'driver' => $this->getDriverName($type),
-            'hostname' => $host ?? null,
-            'username' => $username,
-            'password' => $password,
-            'database' => $dbName
+            'driver' => $driverName,
+            'hostname' => $config['hostname'] ?? null,
+            'username' => $config['username'] ?? null,
+            'password' => $config['password'] ?? null,
+            'database' => $config['database'] ?? null,
+            'use_ssl' => $this->config->Database->use_ssl ?? false,
+            'driver_options' => $this->getDriverOptions($driverName),
         ];
-        if (!empty($port)) {
-            $options['port'] = $port;
+        if (isset($config['port'])) {
+            $options['port'] = $config['port'];
         }
-        return $this->getAdapterFromOptions($options);
+        // Get extra custom options from config:
+        $extraOptions = $this->config?->Database?->extra_options?->toArray() ?? [];
+        // Note: $options takes precedence over $extraOptions -- we don't want users
+        // using extended settings to override values from core settings.
+        return $this->getAdapterFromOptions($options + $extraOptions);
     }
 }

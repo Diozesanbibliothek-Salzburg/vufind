@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Console command: generate sitemaps
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,8 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Util;
 
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -42,15 +45,12 @@ use VuFind\Sitemap\Generator;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'util/sitemap',
+    description: 'XML sitemap generator'
+)]
 class SitemapCommand extends Command
 {
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'util/sitemap';
-
     /**
      * Sitemap generator
      *
@@ -79,19 +79,23 @@ class SitemapCommand extends Command
     protected function configure()
     {
         $this
-            ->setDescription('XML sitemap generator')
             ->setHelp('Generates XML sitemap files.')
             ->addOption(
                 'baseurl',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'base URL (overrides the url setting in Site section of config.ini)'
+                'Base URL (overrides the url setting in Site section of config.ini)'
             )->addOption(
                 'basesitemapurl',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'base sitemap URL (overrides the url setting in Site section of '
+                'Base sitemap URL (overrides the url setting in Site section of '
                 . 'config.ini, or baseSitemapUrl in sitemap.ini)'
+            )->addOption(
+                'filelocation',
+                null,
+                InputOption::VALUE_REQUIRED,
+                'Output path (overrides the fileLocation setting in sitemap.ini)'
             );
     }
 
@@ -113,6 +117,9 @@ class SitemapCommand extends Command
         }
         if ($sitemapUrl = $input->getOption('basesitemapurl')) {
             $this->generator->setBaseSitemapUrl($sitemapUrl);
+        }
+        if ($fileLocation = $input->getOption('filelocation')) {
+            $this->generator->setFileLocation($fileLocation);
         }
         $this->generator->generate();
         foreach ($this->generator->getWarnings() as $warning) {

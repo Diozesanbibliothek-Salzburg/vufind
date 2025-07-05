@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Helper class for displaying search-related HTML chunks.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2011.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\View\Helper\Bootstrap3;
 
 /**
@@ -36,30 +38,6 @@ namespace VuFind\View\Helper\Bootstrap3;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
-class Search extends \VuFind\View\Helper\AbstractSearch
+class Search extends \VuFind\View\Helper\Bootstrap5\Search
 {
-    /**
-     * Get the CSS classes for the container holding the suggestions.
-     *
-     * @return string
-     */
-    protected function getContainerClass()
-    {
-        return 'alert alert-info';
-    }
-
-    /**
-     * Render an expand link.
-     *
-     * @param string                             $url  Link href
-     * @param \Laminas\View\Renderer\PhpRenderer $view View renderer object
-     *
-     * @return string
-     */
-    protected function renderExpandLink($url, $view)
-    {
-        return ' <a href="' . $url
-            . '" title="' . $view->transEsc('spell_expand_alt')
-            . '">(' . $view->transEsc('spell_expand_alt') . ')</a>';
-    }
 }

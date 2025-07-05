@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Console command: VuFind installer.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,13 +26,18 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Install;
 
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
+
+use function in_array;
+use function intval;
 
 /**
  * Console command: VuFind installer.
@@ -42,18 +48,15 @@ use Symfony\Component\Console\Question\Question;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'install/install',
+    description: 'VuFind® installer'
+)]
 class InstallCommand extends Command
 {
-    const MULTISITE_NONE = 0;
-    const MULTISITE_DIR_BASED = 1;
-    const MULTISITE_HOST_BASED = 2;
-
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'install/install';
+    public const MULTISITE_NONE = 0;
+    public const MULTISITE_DIR_BASED = 1;
+    public const MULTISITE_HOST_BASED = 2;
 
     /**
      * Base directory of VuFind installation.
@@ -98,6 +101,27 @@ class InstallCommand extends Command
     protected $basePath = '/vufind';
 
     /**
+     * Solr port to use.
+     *
+     * @var string
+     */
+    protected $solrPort = '8983';
+
+    /**
+     * Should we make backups of existing files?
+     *
+     * @var bool
+     */
+    protected $makeBackups = true;
+
+    /**
+     * Should we display the Apache setup help messages?
+     *
+     * @var bool
+     */
+    protected $showApacheHelp = false;
+
+    /**
      * Constructor
      *
      * @param string|null $name The name of the command; passing null means it must
@@ -106,7 +130,9 @@ class InstallCommand extends Command
     public function __construct($name = null)
     {
         $this->baseDir = str_replace(
-            '\\', '/', realpath(__DIR__ . '/../../../../../../')
+            '\\',
+            '/',
+            realpath(__DIR__ . '/../../../../../../')
         );
         $this->overrideDir = $this->baseDir . '/local';
         parent::__construct($name);
@@ -120,13 +146,12 @@ class InstallCommand extends Command
     protected function configure()
     {
         $this
-            ->setDescription('VuFind installer')
-            ->setHelp('Set up (or modify) initial VuFind installation.')
+            ->setHelp('Set up (or modify) initial VuFind® installation.')
             ->addOption(
                 'use-defaults',
                 null,
                 InputOption::VALUE_NONE,
-                'Use VuFind defaults to configure '
+                'Use VuFind® defaults to configure '
                 . '(ignores any other arguments passed)'
             )->addOption(
                 'overridedir',
@@ -143,7 +168,7 @@ class InstallCommand extends Command
                 'basepath',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'What base path should be used in VuFind\'s URL?'
+                'What base path should be used in VuFind®\'s URL?'
                 . " (defaults to {$this->baseDir} when --non-interactive is set)"
             )->addOption(
                 'multisite',
@@ -156,12 +181,28 @@ class InstallCommand extends Command
                 'hostname',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Specify the hostname for the VuFind Site, when multisite=host'
+                'Specify the hostname for the VuFind® Site, when multisite=host'
+            )->addOption(
+                'solr-port',
+                null,
+                InputOption::VALUE_OPTIONAL,
+                'Port number to use for Solr'
+                . " (defaults to {$this->solrPort} when --non-interactive is set)"
             )->addOption(
                 'non-interactive',
                 null,
                 InputOption::VALUE_NONE,
                 'Use settings if provided via arguments, otherwise use defaults'
+            )->addOption(
+                'skip-backups',
+                null,
+                InputOption::VALUE_NONE,
+                'Overwrite existing files without creating backups'
+            )->addOption(
+                'no-apache-help',
+                null,
+                InputOption::VALUE_NONE,
+                'Skip displaying of Apache configuration help messages when installation is completed'
             );
     }
 
@@ -253,7 +294,7 @@ class InstallCommand extends Command
     {
         // There is one special case for Windows, and a variety of different
         // Unix-flavored possibilities that all work similarly.
-        $msg = (strtoupper(substr(php_uname('s'), 0, 3)) === 'WIN')
+        $msg = PHP_OS_FAMILY === 'Windows'
             ? $this->getWindowsApacheMessage() : $this->getLinuxApacheMessage();
         $output->writeln($msg);
     }
@@ -271,9 +312,25 @@ class InstallCommand extends Command
         if ($allowEmpty && empty($basePath)) {
             return true;
         }
-        return preg_match('/^\/\w*$/', $basePath)
+        return preg_match('/^\/[\w_-]*$/', $basePath)
             ? true
-            : 'Error: Base path must be alphanumeric and start with a slash.';
+            : 'Error: Base path must start with a slash and contain only'
+                . ' alphanumeric characters, dash or underscore.';
+    }
+
+    /**
+     * Validate a Solr port number. Returns true on success, message on failure.
+     *
+     * @param string $solrPort Port to validate.
+     *
+     * @return bool|string
+     */
+    protected function validateSolrPort($solrPort)
+    {
+        if (is_numeric($solrPort)) {
+            return true;
+        }
+        return 'Solr port must be a number.';
     }
 
     /**
@@ -289,8 +346,9 @@ class InstallCommand extends Command
         // Get VuFind base path:
         while (true) {
             $basePathInput = $this->getInput(
-                $input, $output,
-                "What base path should be used in VuFind's URL? [{$this->basePath}] "
+                $input,
+                $output,
+                "What base path should be used in VuFind®'s URL? [{$this->basePath}] "
             );
             if (empty($basePathInput)) {
                 return $this->basePath;
@@ -302,11 +360,37 @@ class InstallCommand extends Command
     }
 
     /**
+     * Get a Solr port number from the user (or return a default).
+     *
+     * @param InputInterface  $input  Input object
+     * @param OutputInterface $output Output object
+     *
+     * @return string
+     */
+    protected function getSolrPort(InputInterface $input, OutputInterface $output)
+    {
+        // Get VuFind base path:
+        while (true) {
+            $solrInput = $this->getInput(
+                $input,
+                $output,
+                "What port number should Solr use? [{$this->solrPort}] "
+            );
+            if (empty($solrInput)) {
+                return $this->solrPort;
+            } elseif (($result = $this->validateSolrPort($solrInput)) === true) {
+                return $solrInput;
+            }
+            $output->writeln($result);
+        }
+    }
+
+    /**
      * Initialize the override directory and report success or failure.
      *
      * @param string $dir Path to attempt to initialize
      *
-     * @return void
+     * @return bool|string
      */
     protected function initializeOverrideDir($dir)
     {
@@ -316,7 +400,7 @@ class InstallCommand extends Command
                 $dir . '/cache',
                 $dir . '/config',
                 $dir . '/harvest',
-                $dir . '/import'
+                $dir . '/import',
             ]
         );
     }
@@ -334,7 +418,8 @@ class InstallCommand extends Command
         // Get override directory path:
         while (true) {
             $overrideDirInput = $this->getInput(
-                $input, $output,
+                $input,
+                $output,
                 'Where would you like to store your local settings? '
                 . "[{$this->overrideDir}] "
             );
@@ -402,16 +487,17 @@ class InstallCommand extends Command
     {
         // Get custom module name:
         $output->writeln(
-            "\nVuFind supports use of a custom module for storing local code "
+            "\nVuFind® supports use of a custom module for storing local code "
             . "changes.\nIf you do not plan to customize the code, you can "
             . "skip this step.\nIf you decide to use a custom module, the name "
             . "you choose will be used for\nthe module's directory name and its "
-            . "PHP namespace."
+            . 'PHP namespace.'
         );
         while (true) {
             $moduleInput = trim(
                 $this->getInput(
-                    $input, $output,
+                    $input,
+                    $output,
                     "\nWhat module name would you like to use? [blank for none] "
                 )
             );
@@ -430,31 +516,34 @@ class InstallCommand extends Command
      *
      * @return int
      */
-    protected function getMultisiteMode(InputInterface $input,
+    protected function getMultisiteMode(
+        InputInterface $input,
         OutputInterface $output
     ) {
         $output->writeln(
-            "\nWhen running multiple VuFind sites against a single installation, you"
-            . " need\nto decide how to distinguish between instances.  Choose an "
-            . "option:\n\n" . self::MULTISITE_DIR_BASED . ".) Directory-based "
+            "\nWhen running multiple VuFind® sites against a single installation, you"
+            . " need\nto decide how to distinguish between instances. Choose an "
+            . "option:\n\n" . self::MULTISITE_DIR_BASED . '.) Directory-based '
             . "(i.e. http://server/vufind1 vs. http://server/vufind2)\n"
             . self::MULTISITE_HOST_BASED
-            . ".) Host-based (i.e. http://vufind1.server vs. http://vufind2.server)"
-            . "\n\nor enter " . self::MULTISITE_NONE . " to disable multisite mode."
+            . '.) Host-based (i.e. http://vufind1.server vs. http://vufind2.server)'
+            . "\n\nor enter " . self::MULTISITE_NONE . ' to disable multisite mode.'
         );
         $legal = [
             self::MULTISITE_NONE,
             self::MULTISITE_DIR_BASED,
-            self::MULTISITE_HOST_BASED
+            self::MULTISITE_HOST_BASED,
         ];
         while (true) {
             $response = $this->getInput(
-                $input, $output, "\nWhich option do you want? "
+                $input,
+                $output,
+                "\nWhich option do you want? "
             );
             if (is_numeric($response) && in_array(intval($response), $legal)) {
                 return intval($response);
             }
-            $output->writeln("Invalid selection.");
+            $output->writeln('Invalid selection.');
         }
     }
 
@@ -489,7 +578,9 @@ class InstallCommand extends Command
     {
         while (true) {
             $response = $this->getInput(
-                $input, $output, "\nPlease enter the hostname for your site: "
+                $input,
+                $output,
+                "\nPlease enter the hostname for your site: "
             );
             if (($result = $this->validateHost($response)) === true) {
                 return $response;
@@ -507,11 +598,35 @@ class InstallCommand extends Command
      *
      * @return string        User-entered response.
      */
-    protected function getInput(InputInterface $input, OutputInterface $output,
+    protected function getInput(
+        InputInterface $input,
+        OutputInterface $output,
         string $prompt
     ): string {
         $question = new Question($prompt, '');
         return $this->getHelper('question')->ask($input, $output, $question);
+    }
+
+    /**
+     * Back up an existing file and inform the user. Return true on success,
+     * error message otherwise.
+     *
+     * @param OutputInterface $output   Output object
+     * @param string          $filename File to back up (if it exists)
+     * @param string          $desc     Description of file (for output message)
+     *
+     * @return bool|string
+     */
+    protected function backUpFile(OutputInterface $output, string $filename, string $desc)
+    {
+        if ($this->makeBackups && file_exists($filename)) {
+            $bak = $filename . '.bak.' . time();
+            if (!copy($filename, $bak)) {
+                return "Problem backing up $filename to $bak";
+            }
+            $output->writeln("Backed up existing $desc to $bak.");
+        }
+        return true;
     }
 
     /**
@@ -542,57 +657,103 @@ class InstallCommand extends Command
         }
         if (!empty($this->module)) {
             $config = str_replace(
-                "#SetEnv VUFIND_LOCAL_MODULES VuFindLocalTemplate",
-                "SetEnv VUFIND_LOCAL_MODULES {$this->module}", $config
+                '#SetEnv VUFIND_LOCAL_MODULES VuFindLocalTemplate',
+                "SetEnv VUFIND_LOCAL_MODULES {$this->module}",
+                $config
             );
         }
 
         // In multisite mode, we need to make environment variables conditional:
         switch ($this->multisiteMode) {
-        case self::MULTISITE_DIR_BASED:
-            $config = preg_replace(
-                '/SetEnv\s+(\w+)\s+(.*)/',
-                'SetEnvIf Request_URI "^' . $this->basePath . '" $1=$2',
-                $config
-            );
-            break;
-        case self::MULTISITE_HOST_BASED:
-            if (($result = $this->validateHost($this->host)) !== true) {
-                return $result;
-            }
-            $config = preg_replace(
-                '/SetEnv\s+(\w+)\s+(.*)/',
-                'SetEnvIfNoCase Host ' . str_replace('.', '\.', $this->host)
-                . ' $1=$2',
-                $config
-            );
-            break;
+            case self::MULTISITE_DIR_BASED:
+                $config = preg_replace(
+                    '/SetEnv\s+(\w+)\s+(.*)/',
+                    'SetEnvIf Request_URI "^' . $this->basePath . '" $1=$2',
+                    $config
+                );
+                break;
+            case self::MULTISITE_HOST_BASED:
+                if (($result = $this->validateHost($this->host)) !== true) {
+                    return $result;
+                }
+                $config = preg_replace(
+                    '/SetEnv\s+(\w+)\s+(.*)/',
+                    'SetEnvIfNoCase Host ' . str_replace('.', '\.', $this->host)
+                    . ' $1=$2',
+                    $config
+                );
+                break;
         }
 
         $target = $this->overrideDir . '/httpd-vufind.conf';
-        if (file_exists($target)) {
-            $bak = $target . '.bak.' . time();
-            copy($target, $bak);
-            $output->writeln("Backed up existing Apache configuration to $bak.");
+        if (($msg = $this->backUpFile($output, $target, 'Apache configuration')) !== true) {
+            return $msg;
         }
         return $this->writeFileToDisk($target, $config)
             ? true : "Problem writing {$this->overrideDir}/httpd-vufind.conf.";
     }
 
     /**
-     * Build the Windows-specific startup configuration. Returns true on success,
+     * Get an array of environment variables.
+     *
+     * @return array
+     */
+    protected function getEnvironmentVariables(): array
+    {
+        $vars = [
+            'VUFIND_HOME' => $this->baseDir,
+            'VUFIND_LOCAL_DIR' => $this->overrideDir,
+            'VUFIND_LOCAL_MODULES' => $this->module,
+            'SOLR_PORT' => $this->solrPort,
+        ];
+        if (empty($vars['VUFIND_LOCAL_MODULES'])) {
+            unset($vars['VUFIND_LOCAL_MODULES']);
+        }
+        return $vars;
+    }
+
+    /**
+     * Build the Unix-specific environment configuration. Returns true on success,
      * error message otherwise.
+     *
+     * @param OutputInterface $output Output object
      *
      * @return bool|string
      */
-    protected function buildWindowsConfig()
+    protected function buildUnixEnvironment($output)
     {
-        $module = empty($this->module)
-            ? '' : "@set VUFIND_LOCAL_MODULES={$this->module}\n";
-        $batch = "@set VUFIND_HOME={$this->baseDir}\n"
-            . "@set VUFIND_LOCAL_DIR={$this->overrideDir}\n" . $module;
-        return $this->writeFileToDisk($this->baseDir . '/env.bat', $batch)
-            ? true : "Problem writing {$this->baseDir}/env.bat.";
+        $filename = $this->baseDir . '/env.sh';
+        if (($msg = $this->backUpFile($output, $filename, 'Unix environment file')) !== true) {
+            return $msg;
+        }
+        $env = '';
+        foreach ($this->getEnvironmentVariables() as $key => $val) {
+            $env .= "export $key=$val\n";
+        }
+        return $this->writeFileToDisk($filename, $env)
+            ? true : "Problem writing {$filename}.";
+    }
+
+    /**
+     * Build the Windows-specific startup configuration. Returns true on success,
+     * error message otherwise.
+     *
+     * @param OutputInterface $output Output object
+     *
+     * @return bool|string
+     */
+    protected function buildWindowsConfig($output)
+    {
+        $filename = $this->baseDir . '/env.bat';
+        if (($msg = $this->backUpFile($output, $filename, 'Windows environment file')) !== true) {
+            return $msg;
+        }
+        $batch = '';
+        foreach ($this->getEnvironmentVariables() as $key => $val) {
+            $batch .= "@set $key=$val\n";
+        }
+        return $this->writeFileToDisk($filename, $batch)
+            ? true : "Problem writing {$filename}.";
     }
 
     /**
@@ -607,14 +768,15 @@ class InstallCommand extends Command
     protected function buildImportConfig(OutputInterface $output, $filename)
     {
         $target = $this->overrideDir . '/import/' . $filename;
-        if (file_exists($target)) {
-            $output->writeln(
-                "Warning: $target already exists; skipping file creation."
-            );
-            return true;
+        if (($msg = $this->backUpFile($output, $target, 'import configuration')) !== true) {
+            return $msg;
         }
         $import = @file_get_contents($this->baseDir . '/import/' . $filename);
-        $import = str_replace("/usr/local/vufind", $this->baseDir, $import);
+        $import = str_replace(
+            ['/usr/local/vufind', ':8983'],
+            [$this->baseDir, ':' . $this->solrPort],
+            $import
+        );
         $import = preg_replace(
             "/^\s*solrmarc.path\s*=.*$/m",
             "solrmarc.path = {$this->overrideDir}/import|{$this->baseDir}/import",
@@ -682,7 +844,7 @@ class InstallCommand extends Command
                 $moduleDir,
                 $moduleDir . '/config',
                 $moduleDir . '/src',
-                $moduleDir . '/src/' . $module
+                $moduleDir . '/src/' . $module,
             ]
         );
         if ($dirStatus !== true) {
@@ -726,7 +888,9 @@ class InstallCommand extends Command
      *
      * @return int
      */
-    protected function failWithError(OutputInterface $output, string $msg,
+    protected function failWithError(
+        OutputInterface $output,
+        string $msg,
         int $status = 1
     ): int {
         $output->writeln($msg);
@@ -742,30 +906,33 @@ class InstallCommand extends Command
      */
     protected function displaySuccessMessage(OutputInterface $output)
     {
-        $output->writeln(
-            "Apache configuration written to {$this->overrideDir}/httpd-vufind.conf."
-            . "\n\nYou now need to load this configuration into Apache."
-        );
-        $this->getApacheLocation($output);
-        if (!empty($this->host)) {
+        if ($this->showApacheHelp) {
             $output->writeln(
-                "Since you are using a host-based multisite configuration, you will "
-                . "also \nneed to do some virtual host configuration. See\n"
-                . "     http://httpd.apache.org/docs/2.4/vhosts/\n"
+                "Apache configuration written to {$this->overrideDir}/httpd-vufind.conf."
+                . "\n\nYou now need to load this configuration into Apache."
+            );
+            $this->getApacheLocation($output);
+            if (!empty($this->host)) {
+                $output->writeln(
+                    'Since you are using a host-based multisite configuration, you will '
+                    . "also \nneed to do some virtual host configuration. See\n"
+                    . "     http://httpd.apache.org/docs/2.4/vhosts/\n"
+                );
+            }
+            if ('/' == $this->basePath) {
+                $output->writeln(
+                    'Since you are installing VuFind® at the root of your domain, you '
+                    . "will also\nneed to edit your Apache configuration to change "
+                    . "DocumentRoot to:\n" . $this->baseDir . "/public\n"
+                );
+            }
+            $output->writeln(
+                "Once the configuration is linked, restart Apache. You should now be able\n"
+                . "to access VuFind® at http://localhost{$this->basePath}"
             );
         }
-        if ('/' == $this->basePath) {
-            $output->writeln(
-                "Since you are installing VuFind at the root of your domain, you "
-                . "will also\nneed to edit your Apache configuration to change "
-                . "DocumentRoot to:\n" . $this->baseDir . "/public\n"
-            );
-        }
-        $output->writeln(
-            "Once the configuration is linked, restart Apache.  You should now be "
-            . "able\nto access VuFind at http://localhost{$this->basePath}\n\nFor "
-            . "proper use of command line tools, you should also ensure that your\n"
-        );
+        $output->writeln('');
+        $output->writeln("For proper use of command line tools, you should ensure that your\n");
         $finalMsg = empty($this->addOptionmodule)
             ? "VUFIND_HOME and VUFIND_LOCAL_DIR environment variables are set to\n"
             . "{$this->baseDir} and {$this->overrideDir} respectively."
@@ -773,6 +940,7 @@ class InstallCommand extends Command
             . "variables are set to {$this->baseDir}, {$this->module} and "
             . "{$this->overrideDir} respectively.";
         $output->writeln($finalMsg);
+        $output->writeln('');
     }
 
     /**
@@ -783,7 +951,8 @@ class InstallCommand extends Command
      *
      * @return int 0 for success
      */
-    protected function collectParameters(InputInterface $input,
+    protected function collectParameters(
+        InputInterface $input,
         OutputInterface $output
     ) {
         // Are we allowing user interaction?
@@ -792,13 +961,13 @@ class InstallCommand extends Command
 
         // Load user settings if we are not forcing defaults:
         if (!$input->getOption('use-defaults')) {
-            $overrideDir = trim($input->getOption('overridedir'));
+            $overrideDir = trim($input->getOption('overridedir') ?? '');
             if (!empty($overrideDir)) {
                 $this->overrideDir = $overrideDir;
             } elseif ($interactive) {
                 $userInputNeeded['overrideDir'] = true;
             }
-            $moduleName = trim($input->getOption('module-name'));
+            $moduleName = trim($input->getOption('module-name') ?? '');
             if (!empty($moduleName) && $moduleName !== 'disabled') {
                 if (($result = $this->validateModules($moduleName)) !== true) {
                     return $this->failWithError($output, $result);
@@ -808,7 +977,7 @@ class InstallCommand extends Command
                 $userInputNeeded['module'] = true;
             }
 
-            $basePath = trim($input->getOption('basepath'));
+            $basePath = trim($input->getOption('basepath') ?? '');
             if (!empty($basePath)) {
                 if (($result = $this->validateBasePath($basePath, true)) !== true) {
                     return $this->failWithError($output, $result);
@@ -816,6 +985,16 @@ class InstallCommand extends Command
                 $this->basePath = $basePath;
             } elseif ($interactive) {
                 $userInputNeeded['basePath'] = true;
+            }
+
+            $solrPort = trim($input->getOption('solr-port') ?? '');
+            if (!empty($solrPort)) {
+                if (($result = $this->validateSolrPort($solrPort)) !== true) {
+                    return $this->failWithError($output, $result);
+                }
+                $this->solrPort = $solrPort;
+            } elseif ($interactive) {
+                $userInputNeeded['solr-port'] = true;
             }
 
             // We assume "single site" mode unless the --multisite option is set;
@@ -828,7 +1007,8 @@ class InstallCommand extends Command
                 $this->multisiteMode = self::MULTISITE_HOST_BASED;
             } elseif ($mode !== true && $mode !== null && $mode !== false) {
                 return $this->failWithError(
-                    $output, 'Unexpected multisite mode: ' . $mode
+                    $output,
+                    'Unexpected multisite mode: ' . $mode
                 );
             } elseif ($interactive && $mode !== false) {
                 $userInputNeeded['multisiteMode'] = true;
@@ -845,6 +1025,9 @@ class InstallCommand extends Command
             if (isset($userInputNeeded['basePath'])) {
                 $this->basePath = $this->getBasePath($input, $output);
             }
+            if (isset($userInputNeeded['solr-port'])) {
+                $this->solrPort = $this->getSolrPort($input, $output);
+            }
             if (isset($userInputNeeded['multisiteMode'])) {
                 $this->multisiteMode = $this->getMultisiteMode($input, $output);
             }
@@ -860,6 +1043,13 @@ class InstallCommand extends Command
         // Normalize the module setting to remove whitespace:
         $this->module = preg_replace('/\s/', '', $this->module);
 
+        // Should we make backups of existing files?
+        if ($input->getOption('skip-backups')) {
+            $this->makeBackups = false;
+        }
+
+        // Should we display Apache help messages?
+        $this->showApacheHelp = !$input->getOption('no-apache-help');
         return 0;
     }
 
@@ -883,7 +1073,12 @@ class InstallCommand extends Command
         }
 
         // Build the Windows start file in case we need it:
-        if (($result = $this->buildWindowsConfig()) !== true) {
+        if (($result = $this->buildWindowsConfig($output)) !== true) {
+            return $this->failWithError($output, $result);
+        }
+
+        // Build a Unix environment file in case we need it:
+        if (($result = $this->buildUnixEnvironment($output)) !== true) {
             return $this->failWithError($output, $result);
         }
 
@@ -916,11 +1111,12 @@ class InstallCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $output->writeln("VuFind has been found in {$this->baseDir}.");
+        $output->writeln("VuFind® has been found in {$this->baseDir}.");
 
         // Collect and process parameters, and stop if an error is encountered
         // along the way....
-        if ($this->collectParameters($input, $output) !== 0
+        if (
+            $this->collectParameters($input, $output) !== 0
             || $this->processParameters($output) !== 0
         ) {
             return 1;
@@ -928,5 +1124,6 @@ class InstallCommand extends Command
 
         // Report success:
         $this->displaySuccessMessage($output);
+        return 0;
     }
 }

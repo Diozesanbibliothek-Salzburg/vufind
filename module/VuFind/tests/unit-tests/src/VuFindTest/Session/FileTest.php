@@ -1,8 +1,9 @@
 <?php
+
 /**
  * File Session Handler Test Class
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2019.
  *
@@ -25,9 +26,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:testing:unit_tests Wiki
  */
+
 namespace VuFindTest\Session;
 
 use VuFind\Session\File;
+
+use function function_exists;
 
 /**
  * File Session Handler Test Class
@@ -119,7 +123,7 @@ class FileTest extends \VuFindTest\Unit\SessionHandlerTestCase
         $this->assertEquals('bar', $handler->read('foo'));
         // Use a negative garbage collection age so we can purge everything
         // without having to wait for time to pass in the test!
-        $this->assertTrue($handler->gc(-1));
+        $this->assertEquals(1, $handler->gc(-1));
         $this->assertEquals('', $handler->read('foo'));
     }
 
@@ -138,7 +142,7 @@ class FileTest extends \VuFindTest\Unit\SessionHandlerTestCase
             );
         }
         $handler = new File($config);
-        $this->injectMockDatabaseTables($handler);
+        $this->injectMockDatabaseDependencies($handler);
         return $handler;
     }
 }

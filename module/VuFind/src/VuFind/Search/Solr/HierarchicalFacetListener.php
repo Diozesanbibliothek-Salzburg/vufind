@@ -3,7 +3,7 @@
 /**
  * Solr hierarchical facet listener.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2013.
  * Copyright (C) The National Library of Finland 2014.
@@ -28,14 +28,19 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Site
  */
+
 namespace VuFind\Search\Solr;
 
 use Laminas\EventManager\EventInterface;
-
 use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\ServiceManager\ServiceLocatorInterface;
 use VuFind\I18n\TranslatableString;
+use VuFind\Service\GetServiceTrait;
 use VuFindSearch\Backend\BackendInterface;
+use VuFindSearch\Service;
+
+use function in_array;
+use function is_array;
 
 /**
  * Solr hierarchical facet handling listener.
@@ -49,19 +54,14 @@ use VuFindSearch\Backend\BackendInterface;
  */
 class HierarchicalFacetListener
 {
+    use GetServiceTrait;
+
     /**
      * Backend.
      *
      * @var BackendInterface
      */
     protected $backend;
-
-    /**
-     * Superior service manager.
-     *
-     * @var ServiceLocatorInterface
-     */
-    protected $serviceLocator;
 
     /**
      * Facet configuration.
@@ -122,10 +122,9 @@ class HierarchicalFacetListener
         $this->backend = $backend;
         $this->serviceLocator = $serviceLocator;
 
-        $config = $this->serviceLocator->get(\VuFind\Config\PluginManager::class);
+        $config = $this->getService(\VuFind\Config\PluginManager::class);
         $this->facetConfig = $config->get($facetConfig);
-        $this->facetHelper = $this->serviceLocator
-            ->get(\VuFind\Search\Solr\HierarchicalFacetHelper::class);
+        $this->facetHelper = $this->getService(\VuFind\Search\Solr\HierarchicalFacetHelper::class);
 
         $specialFacets = $this->facetConfig->SpecialFacets;
         $this->displayStyles
@@ -158,7 +157,11 @@ class HierarchicalFacetListener
     public function attach(
         SharedEventManagerInterface $manager
     ) {
-        $manager->attach('VuFind\Search', 'post', [$this, 'onSearchPost']);
+        $manager->attach(
+            Service::class,
+            Service::EVENT_POST,
+            [$this, 'onSearchPost']
+        );
     }
 
     /**
@@ -170,13 +173,14 @@ class HierarchicalFacetListener
      */
     public function onSearchPost(EventInterface $event)
     {
-        $backend = $event->getParam('backend');
+        $command = $event->getParam('command');
 
-        if ($backend != $this->backend->getIdentifier()) {
+        if ($command->getTargetIdentifier() !== $this->backend->getIdentifier()) {
             return $event;
         }
-        $context = $event->getParam('context');
-        if ($context == 'search' || $context == 'retrieve'
+        $context = $command->getContext();
+        if (
+            $context == 'search' || $context == 'retrieve'
             || $context == 'retrieveBatch' || $context == 'similar'
         ) {
             $this->processHierarchicalFacets($event);
@@ -196,7 +200,7 @@ class HierarchicalFacetListener
         if (empty($this->facetConfig->SpecialFacets->hierarchical)) {
             return;
         }
-        $result = $event->getTarget();
+        $result = $event->getParam('command')->getResult();
         foreach ($result->getRecords() as $record) {
             $fields = $record->getRawData();
             foreach ($this->facetConfig->SpecialFacets->hierarchical as $facetName) {
@@ -209,9 +213,11 @@ class HierarchicalFacetListener
                         // Include a translation for each value only if we don't
                         // display full hierarchy or this is the deepest hierarchy
                         // level available
-                        if (!$allLevels
+                        if (
+                            !$allLevels
                             || $this->facetHelper->isDeepestFacetLevel(
-                                $fields[$facetName], $value
+                                $fields[$facetName],
+                                $value
                             )
                         ) {
                             $value = $this->formatFacetField($facetName, $value);

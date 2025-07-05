@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Record tab plugin manager
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
+
 namespace VuFind\RecordTab;
 
 use Laminas\ServiceManager\Factory\InvokableFactory;
@@ -54,7 +56,7 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
         'formats' => Formats::class,
         'hierarchytree' => HierarchyTree::class,
         'holdingsils' => HoldingsILS::class,
-        'holdingsworldcat' => HoldingsWorldCat::class,
+        'holdingsworldcat2' => HoldingsWorldCat2::class,
         'map' => Map::class,
         'preview' => Preview::class,
         'reviews' => Reviews::class,
@@ -82,8 +84,9 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
         Formats::class => InvokableFactory::class,
         HierarchyTree::class => HierarchyTreeFactory::class,
         HoldingsILS::class => HoldingsILSFactory::class,
-        HoldingsWorldCat::class => HoldingsWorldCatFactory::class,
+        HoldingsWorldCat2::class => HoldingsWorldCat2Factory::class,
         Map::class => MapFactory::class,
+        OverdriveHoldings::class => InvokableFactory::class,
         Preview::class => PreviewFactory::class,
         Reviews::class => ReviewsFactory::class,
         Search2CollectionList::class => CollectionListFactory::class,
@@ -105,7 +108,8 @@ class PluginManager extends \VuFind\ServiceManager\AbstractPluginManager
      * @param array $v3config                  If $configOrContainerInstance is a
      * container, this value will be passed to the parent constructor.
      */
-    public function __construct($configOrContainerInstance = null,
+    public function __construct(
+        $configOrContainerInstance = null,
         array $v3config = []
     ) {
         $this->addAbstractFactory(PluginFactory::class);

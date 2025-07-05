@@ -1,8 +1,9 @@
 <?php
+
 /**
  * VuFind dynamic role provider factory.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2007.
  *
@@ -25,11 +26,14 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFind\Role;
 
-use Interop\Container\ContainerInterface;
 use Laminas\ServiceManager\Config;
 use Laminas\ServiceManager\Factory\FactoryInterface;
+use Psr\Container\ContainerInterface;
+
+use function in_array;
 
 /**
  * VuFind dynamic role provider factory.
@@ -45,62 +49,45 @@ class DynamicRoleProviderFactory implements FactoryInterface
     /**
      * Create service
      *
-     * @param ContainerInterface $sm      Service manager
-     * @param string             $name    Requested service name (unused)
-     * @param array              $options Extra options (unused)
+     * @param ContainerInterface $container Service container
+     * @param string             $name      Requested service name (unused)
+     * @param array              $options   Extra options (unused)
      *
-     * @return DynamicRoleProvider
+     * @return object
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function __invoke(ContainerInterface $sm, $name, array $options = null)
+    public function __invoke(ContainerInterface $container, $name, array $options = null)
     {
-        $config = $sm->get('config');
-        $rbacConfig = $config['lmc_rbac'];
-        return new DynamicRoleProvider(
-            $this->getPermissionProviderPluginManager($sm, $rbacConfig),
-            $this->getPermissionConfiguration($sm, $rbacConfig)
+        $config = $container->get('config');
+        return new $name(
+            $container->get(PermissionProvider\PluginManager::class),
+            $this->getPermissionConfiguration($container, $config['lmc_rbac'])
         );
-    }
-
-    /**
-     * Create the supporting plugin manager.
-     *
-     * @param ContainerInterface $serviceLocator Service locator
-     * @param array              $rbacConfig     LmcRbacMvc configuration
-     *
-     * @return PermissionProviderPluginManager
-     */
-    protected function getPermissionProviderPluginManager(
-        ContainerInterface $serviceLocator, array $rbacConfig
-    ) {
-        $pm = new PermissionProvider\PluginManager(
-            $serviceLocator,
-            $rbacConfig['vufind_permission_provider_manager']
-        );
-        return $pm;
     }
 
     /**
      * Get a configuration array.
      *
-     * @param ContainerInterface $serviceLocator Service locator
-     * @param array              $rbacConfig     LmcRbacMvc configuration
+     * @param ContainerInterface $container  Service container
+     * @param array              $rbacConfig LmcRbacMvc configuration
      *
      * @return array
      */
     protected function getPermissionConfiguration(
-        ContainerInterface $serviceLocator, array $rbacConfig
+        ContainerInterface $container,
+        array $rbacConfig
     ) {
         // Get role provider settings from the LmcRbacMvc configuration:
         $config = $rbacConfig['role_provider']['VuFind\Role\DynamicRoleProvider'];
 
         // Load the permissions:
-        $configLoader = $serviceLocator->get(\VuFind\Config\PluginManager::class);
+        $configLoader = $container->get(\VuFind\Config\PluginManager::class);
         $permissions = $configLoader->get('permissions')->toArray();
 
         // If we're configured to map legacy settings, do so now:
-        if (isset($config['map_legacy_settings'])
+        if (
+            isset($config['map_legacy_settings'])
             && $config['map_legacy_settings']
         ) {
             $permissions = $this->addLegacySettings($configLoader, $permissions);
@@ -117,7 +104,8 @@ class DynamicRoleProviderFactory implements FactoryInterface
      *
      * @return array
      */
-    protected function addLegacySettings(\VuFind\Config\PluginManager $loader,
+    protected function addLegacySettings(
+        \VuFind\Config\PluginManager $loader,
         array $permissions
     ) {
         // Add admin settings if they are absent:
@@ -192,7 +180,8 @@ class DynamicRoleProviderFactory implements FactoryInterface
     protected function permissionDefined(array $config, $permission)
     {
         foreach ($config as $current) {
-            if (isset($current['permission'])
+            if (
+                isset($current['permission'])
                 && in_array($permission, (array)$current['permission'])
             ) {
                 return true;

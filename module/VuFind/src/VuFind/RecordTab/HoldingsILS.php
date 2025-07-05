@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Holdings (ILS) tab
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,9 +26,12 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:record_tabs Wiki
  */
+
 namespace VuFind\RecordTab;
 
 use VuFind\ILS\Connection;
+
+use function strlen;
 
 /**
  * Holdings (ILS) tab
@@ -43,14 +47,14 @@ class HoldingsILS extends AbstractBase
     /**
      * ILS connection (or null if not applicable)
      *
-     * @param Connection
+     * @var Connection
      */
     protected $catalog;
 
     /**
      * Name of template to use for rendering holdings.
      *
-     * @param string
+     * @var string
      */
     protected $template;
 
@@ -64,14 +68,16 @@ class HoldingsILS extends AbstractBase
     /**
      * Constructor
      *
-     * @param \VuFind\ILS\Connection|bool $catalog       ILS connection to use to
+     * @param \VuFind\ILS\Connection|null $catalog       ILS connection to use to
      * check for holdings before displaying the tab; may be set to null if no check
      * is needed.
-     * @param string                      $template      Holdings template to use
+     * @param string|null                 $template      Holdings template to use
      * @param bool                        $hideWhenEmpty Whether the
      * holdings tab should be hidden when empty or not
      */
-    public function __construct(Connection $catalog = null, $template = null,
+    public function __construct(
+        Connection $catalog = null,
+        $template = null,
         $hideWhenEmpty = false
     ) {
         $this->catalog = $catalog;
@@ -90,14 +96,15 @@ class HoldingsILS extends AbstractBase
     }
 
     /**
-     * Support method used by template -- extract all unique call numbers from
+     * Support method used in getUniqueCallNumbers for templates when full
+     * details are not supported -- extract all unique call numbers from
      * an array of items.
      *
      * @param array $items Items to search through.
      *
      * @return array
      */
-    public function getUniqueCallNumbers($items)
+    protected function getSimpleUniqueCallNumbers($items)
     {
         $callNos = [];
         foreach ($items as $item) {
@@ -107,6 +114,48 @@ class HoldingsILS extends AbstractBase
         }
         sort($callNos);
         return array_unique($callNos);
+    }
+
+    /**
+     * Support method used by template -- extract all unique call numbers from
+     * an array of items.
+     *
+     * @param array $items       Items to search through.
+     * @param bool  $fullDetails Whether or not to return the full details about
+     *                           call numbers or only the simple legacy format.
+     *
+     * @return array
+     */
+    public function getUniqueCallNumbers($items, $fullDetails = false)
+    {
+        if (!$fullDetails) {
+            return $this->getSimpleUniqueCallNumbers($items);
+        }
+
+        $callNos = [];
+        foreach ($items as $item) {
+            if (strlen($item['callnumber'] ?? '') > 0) {
+                $prefix = $item['callnumber_prefix'] ?? '';
+                $callnumber = $item['callnumber'];
+                $display = $prefix ? $prefix . ' ' . $callnumber : $callnumber;
+                $callNos[] = compact('callnumber', 'display', 'prefix');
+            }
+        }
+
+        $unique = [];
+        foreach ($callNos as $no) {
+            $unique[$no['display']] = $no;
+        }
+        $callNosUnique = array_values($unique);
+
+        uasort(
+            $callNosUnique,
+            function ($a, $b) {
+                return $a['display'] <=> $b['display'];
+            }
+        );
+
+        return $callNosUnique;
     }
 
     /**
@@ -142,7 +191,7 @@ class HoldingsILS extends AbstractBase
     public function getPaginator($totalItemCount, $page, $itemLimit)
     {
         // Return if a paginator is not needed or not supported ($itemLimit = null)
-        if (!$itemLimit || $totalItemCount < $itemLimit) {
+        if (!$itemLimit || $totalItemCount <= $itemLimit) {
             return;
         }
 

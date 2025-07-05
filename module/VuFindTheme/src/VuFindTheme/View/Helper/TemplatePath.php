@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Helper to get path to a template from another theme (for including)
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2019.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindTheme\View\Helper;
 
 use Laminas\View\Resolver\TemplatePathStack;
@@ -55,6 +57,13 @@ class TemplatePath extends \Laminas\View\Helper\AbstractHelper
     protected $pathPost;
 
     /**
+     * Template path stack
+     *
+     * @var TemplatePathStack
+     */
+    protected $templatePathStack;
+
+    /**
      * Constructor
      *
      * @param TemplatePathStack $templateStack Inheritance stack of template paths
@@ -66,7 +75,7 @@ class TemplatePath extends \Laminas\View\Helper\AbstractHelper
         $paths = $this->templatePathStack->getPaths();
         // split for easy replacement later
         preg_match('/\/themes\/([^\/]+)/', $paths->current(), $matches);
-        list($this->pathPre, $this->pathPost)
+        [$this->pathPre, $this->pathPost]
             = explode($matches[1], $paths->current());
     }
 
@@ -77,14 +86,14 @@ class TemplatePath extends \Laminas\View\Helper\AbstractHelper
      * @param string $targetTheme template to pull the template from
      *
      * @return string path, null if image not found
-     * @throws Exception if no file exists at path
+     * @throws \Exception if no file exists at path
      */
     public function __invoke($template, $targetTheme)
     {
         $path = $this->pathPre . $targetTheme . $this->pathPost . $template;
         if (!file_exists($path)) {
             throw new \Exception(
-                'template not found in ' . $targetTheme . ': ' . $template
+                'Template not found in ' . $targetTheme . ': ' . $template
             );
         }
         return $path;

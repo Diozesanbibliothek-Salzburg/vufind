@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Flash message view helper
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\View\Helper\Bootstrap3;
 
 /**
@@ -36,20 +38,6 @@ namespace VuFind\View\Helper\Bootstrap3;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
-class Flashmessages extends \VuFind\View\Helper\Root\Flashmessages
+class Flashmessages extends \VuFind\View\Helper\Bootstrap5\Flashmessages
 {
-    /**
-     * Get the CSS class to correspond with a messenger namespace
-     *
-     * @param string $ns Namespace
-     *
-     * @return string
-     */
-    protected function getClassForNamespace($ns)
-    {
-        if ($ns == 'error') {
-            $ns = 'danger';
-        }
-        return 'flash-message alert alert-' . $ns;
-    }
 }

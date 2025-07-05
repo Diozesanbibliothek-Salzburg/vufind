@@ -1,8 +1,9 @@
 <?php
+
 /**
  * OAI Server class
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  * Copyright (C) The National Library of Finland 2018-2019.
@@ -27,12 +28,21 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\OAI;
 
 use SimpleXMLElement;
+use VuFind\Db\Entity\ChangeTrackerEntityInterface;
+use VuFind\Db\Service\ChangeTrackerServiceInterface;
+use VuFind\Db\Service\OaiResumptionServiceInterface;
 use VuFind\Exception\RecordMissing as RecordMissingException;
 use VuFind\SimpleXML;
 use VuFindApi\Formatter\RecordFormatter;
+
+use function count;
+use function in_array;
+use function intval;
+use function strlen;
 
 /**
  * OAI Server class
@@ -140,32 +150,11 @@ class Server
     protected $adminEmail;
 
     /**
-     * Results plugin manager
-     *
-     * @var \VuFind\Search\Results\PluginManager
-     */
-    protected $resultsManager;
-
-    /**
-     * Record loader
-     *
-     * @var \VuFind\Record\Loader
-     */
-    protected $recordLoader;
-
-    /**
-     * Table manager
-     *
-     * @var \VuFind\Db\Table\PluginManager
-     */
-    protected $tableManager;
-
-    /**
      * Record link helper (optional)
      *
-     * @var \VuFind\View\Helper\Root\RecordLink
+     * @var \VuFind\View\Helper\Root\RecordLinker
      */
-    protected $recordLinkHelper = null;
+    protected $recordLinkerHelper = null;
 
     /**
      * Set queries
@@ -212,19 +201,45 @@ class Server
     protected $deleteLifetime = null;
 
     /**
+     * Should we use cursorMarks for Solr retrieval? Normally this is the best
+     * option, but it is incompatible with some other Solr features and may need
+     * to be disabled in rare circumstances (e.g. when using field collapsing/
+     * result grouping).
+     *
+     * @var bool
+     */
+    protected $useCursorMark = true;
+
+    /**
+     * List of possible valid OAI-PMH error codes
+     *
+     * @var string[]
+     */
+    protected $legalErrorCodes = [
+        'cannotDisseminateFormat',
+        'idDoesNotExist',
+        'badArgument',
+        'badVerb',
+        'noMetadataFormats',
+        'noRecordsMatch',
+        'badResumptionToken',
+        'noSetHierarchy',
+    ];
+
+    /**
      * Constructor
      *
-     * @param \VuFind\Search\Results\PluginManager $results Search manager for
-     * retrieving records
-     * @param \VuFind\Record\Loader                $loader  Record loader
-     * @param \VuFind\Db\Table\PluginManager       $tables  Table manager
+     * @param \VuFind\Search\Results\PluginManager $resultsManager    Search manager for retrieving records
+     * @param \VuFind\Record\Loader                $recordLoader      Record loader
+     * @param ChangeTrackerServiceInterface        $trackerService    ChangeTracker Service
+     * @param OaiResumptionServiceInterface        $resumptionService Database service for resumption tokens
      */
-    public function __construct(\VuFind\Search\Results\PluginManager $results,
-        \VuFind\Record\Loader $loader, \VuFind\Db\Table\PluginManager $tables
+    public function __construct(
+        protected \VuFind\Search\Results\PluginManager $resultsManager,
+        protected \VuFind\Record\Loader $recordLoader,
+        protected ChangeTrackerServiceInterface $trackerService,
+        protected OaiResumptionServiceInterface $resumptionService
     ) {
-        $this->resultsManager = $results;
-        $this->recordLoader = $loader;
-        $this->tableManager = $tables;
     }
 
     /**
@@ -237,7 +252,7 @@ class Server
      *
      * @return void
      */
-    public function init(\Laminas\Config\Config $config, $baseURL, $params)
+    public function init(\Laminas\Config\Config $config, $baseURL, array $params)
     {
         $this->baseURL = $baseURL;
         $parts = parse_url($baseURL);
@@ -245,21 +260,21 @@ class Server
         if (isset($parts['port'])) {
             $this->baseHostURL .= $parts['port'];
         }
-        $this->params = isset($params) && is_array($params) ? $params : [];
+        $this->params = $params;
         $this->initializeSettings($config); // Load config.ini settings
     }
 
     /**
-     * Add a record link helper (optional -- allows enhancement of some metadata
+     * Add a record linker helper (optional -- allows enhancement of some metadata
      * with VuFind-specific links).
      *
-     * @param \VuFind\View\Helper\Root\RecordLink $helper Helper to set
+     * @param \VuFind\View\Helper\Root\RecordLinker $helper Helper to set
      *
      * @return void
      */
-    public function setRecordLinkHelper($helper)
+    public function setRecordLinkerHelper($helper)
     {
-        $this->recordLinkHelper = $helper;
+        $this->recordLinkerHelper = $helper;
     }
 
     /**
@@ -304,19 +319,19 @@ class Server
             return $this->showError('badVerb', 'Missing Verb Argument');
         } else {
             switch ($this->params['verb']) {
-            case 'GetRecord':
-                return $this->getRecord();
-            case 'Identify':
-                return $this->identify();
-            case 'ListIdentifiers':
-            case 'ListRecords':
-                return $this->listRecords($this->params['verb']);
-            case 'ListMetadataFormats':
-                return $this->listMetadataFormats();
-            case 'ListSets':
-                return $this->listSets();
-            default:
-                return $this->showError('badVerb', 'Illegal OAI Verb');
+                case 'GetRecord':
+                    return $this->getRecord();
+                case 'Identify':
+                    return $this->identify();
+                case 'ListIdentifiers':
+                case 'ListRecords':
+                    return $this->listRecords($this->params['verb']);
+                case 'ListMetadataFormats':
+                    return $this->listMetadataFormats();
+                case 'ListSets':
+                    return $this->listSets();
+                default:
+                    return $this->showError('badVerb', 'Illegal OAI Verb');
             }
         }
     }
@@ -324,21 +339,22 @@ class Server
     /**
      * Assign necessary interface variables to display a deleted record.
      *
-     * @param SimpleXMLElement $xml        XML to update
-     * @param array            $tracker    Array representing a change_tracker row
-     * @param bool             $headerOnly Only attach the header?
+     * @param SimpleXMLElement             $xml           XML to update
+     * @param ChangeTrackerEntityInterface $trackerEntity ChangeTracker entity
+     * @param bool                         $headerOnly    Only attach the header?
      *
      * @return void
      */
-    protected function attachDeleted($xml, $tracker, $headerOnly = false)
+    protected function attachDeleted($xml, $trackerEntity, $headerOnly = false)
     {
-        // Deleted records only have a header, no metadata.  However, depending
+        // Deleted records only have a header, no metadata. However, depending
         // on the context we are attaching them, they may or may not need a
         // <record> tag wrapping the header.
         $record = $headerOnly ? $xml : $xml->addChild('record');
         $this->attachRecordHeader(
-            $record, $this->prefixID($tracker['id']),
-            date($this->iso8601, $this->normalizeDate($tracker['deleted'])),
+            $record,
+            $this->prefixID($trackerEntity->getId()),
+            date($this->iso8601, $trackerEntity->getDeleted()->getTimestamp()),
             [],
             'deleted'
         );
@@ -355,7 +371,11 @@ class Server
      *
      * @return void
      */
-    protected function attachRecordHeader($xml, $id, $date, $sets = [],
+    protected function attachRecordHeader(
+        $xml,
+        $id,
+        $date,
+        $sets = [],
         $status = ''
     ) {
         $header = $xml->addChild('header');
@@ -383,10 +403,12 @@ class Server
         $recordDoc = new \DOMDocument();
         $vufindFormat = $this->getMetadataFormats()['oai_vufind_json'];
         $rootNode = $recordDoc->createElementNS(
-            $vufindFormat['namespace'], 'oai_vufind_json:record'
+            $vufindFormat['namespace'],
+            'oai_vufind_json:record'
         );
         $rootNode->setAttribute(
-            'xmlns:xsi', 'http://www.w3.org/2001/XMLSchema-instance'
+            'xmlns:xsi',
+            'http://www.w3.org/2001/XMLSchema-instance'
         );
         $rootNode->setAttribute(
             'xsi:schemaLocation',
@@ -397,7 +419,7 @@ class Server
         // Add oai_dc part
         $oaiDc = new \DOMDocument();
         $oaiDc->loadXML(
-            $record->getXML('oai_dc', $this->baseHostURL, $this->recordLinkHelper)
+            $record->getXML('oai_dc', $this->baseHostURL, $this->recordLinkerHelper)
         );
         $rootNode->appendChild(
             $recordDoc->importNode($oaiDc->documentElement, true)
@@ -405,10 +427,12 @@ class Server
 
         // Add VuFind metadata
         $records = $this->recordFormatter->format(
-            [$record], $this->vufindApiFields
+            [$record],
+            $this->vufindApiFields
         );
         $metadataNode = $recordDoc->createElementNS(
-            $vufindFormat['namespace'], 'oai_vufind_json:metadata'
+            $vufindFormat['namespace'],
+            'oai_vufind_json:metadata'
         );
         $metadataNode->setAttribute('type', 'application/json');
         $metadataNode->appendChild(
@@ -430,8 +454,12 @@ class Server
      *
      * @return bool
      */
-    protected function attachNonDeleted($container, $record, $format,
-        $headerOnly = false, $set = ''
+    protected function attachNonDeleted(
+        $container,
+        $record,
+        $format,
+        $headerOnly = false,
+        $set = ''
     ) {
         // Get the XML (and display an error if it is unsupported):
         if ($format === false) {
@@ -440,7 +468,7 @@ class Server
             $xml = $this->getVuFindMetadata($record);   // special case
         } else {
             $xml = $record
-                ->getXML($format, $this->baseHostURL, $this->recordLinkHelper);
+                ->getXML($format, $this->baseHostURL, $this->recordLinkerHelper);
             if ($xml === false) {
                 return false;
             }
@@ -474,7 +502,10 @@ class Server
         // preferences):
         $recXml = $headerOnly ? $container : $container->addChild('record');
         $this->attachRecordHeader(
-            $recXml, $this->prefixID($record->getUniqueID()), $date, $sets
+            $recXml,
+            $this->prefixID($record->getUniqueID()),
+            $date,
+            $sets
         );
 
         // Inject metadata if necessary:
@@ -508,19 +539,22 @@ class Server
         // Retrieve the record from the index
         if ($record = $this->loadRecord($this->params['identifier'])) {
             $success = $this->attachNonDeleted(
-                $xml, $record, $this->params['metadataPrefix']
+                $xml,
+                $record,
+                $this->params['metadataPrefix']
             );
             if (!$success) {
                 return $this->showError('cannotDisseminateFormat', 'Unknown Format');
             }
         } else {
             // No record in index -- is this deleted?
-            $tracker = $this->tableManager->get('ChangeTracker');
-            $row = $tracker->retrieve(
-                $this->core, $this->stripID($this->params['identifier'])
+
+            $row = $this->trackerService->getChangeTrackerEntity(
+                $this->core,
+                $this->stripID($this->params['identifier'])
             );
-            if (!empty($row) && !empty($row->deleted)) {
-                $this->attachDeleted($xml, $row->toArray());
+            if (!empty($row) && !empty($row->getDeleted())) {
+                $this->attachDeleted($xml, $row);
             } else {
                 // Not deleted and not found in index -- error!
                 return $this->showError('idDoesNotExist', 'Unknown Record');
@@ -561,7 +595,8 @@ class Server
         $xml->granularity = 'YYYY-MM-DDThh:mm:ssZ';
         if (!empty($this->idNamespace)) {
             $id = $xml->addChild('description')->addChild(
-                'oai-identifier', null,
+                'oai-identifier',
+                null,
                 'http://www.openarchives.org/OAI/2.0/oai-identifier'
             );
             $id->addAttribute(
@@ -608,7 +643,7 @@ class Server
         if ($this->supportsVuFindMetadata()) {
             $this->metadataFormats['oai_vufind_json'] = [
                 'schema' => 'https://vufind.org/xsd/oai_vufind_json-1.0.xsd',
-                'namespace' => 'http://vufind.org/oai_vufind_json-1.0'
+                'namespace' => 'http://vufind.org/oai_vufind_json-1.0',
             ];
         } else {
             unset($this->metadataFormats['oai_vufind_json']);
@@ -629,7 +664,7 @@ class Server
     }
 
     /**
-     * Load data from the OAI section of config.ini.  (This is called by the
+     * Load data from the OAI section of config.ini. (This is called by the
      * constructor and is only a separate method to allow easy override by child
      * classes).
      *
@@ -675,7 +710,8 @@ class Server
         // Initialize VuFind API format fields:
         $this->vufindApiFields = array_filter(
             explode(
-                ',', $config->OAI->vufind_api_format_fields ?? ''
+                ',',
+                $config->OAI->vufind_api_format_fields ?? ''
             )
         );
 
@@ -688,6 +724,12 @@ class Server
         // Initialize delete lifetime, if set:
         if (isset($config->OAI->delete_lifetime)) {
             $this->deleteLifetime = intval($config->OAI->delete_lifetime);
+        }
+
+        // Change cursormark behavior if necessary:
+        $cursor = $config->OAI->use_cursor ?? true;
+        if (!$cursor || strtolower($cursor) === 'false') {
+            $this->useCursorMark = false;
         }
     }
 
@@ -715,7 +757,8 @@ class Server
         $response = $this->createResponse();
         $xml = $response->addChild('ListMetadataFormats');
         foreach ($this->getMetadataFormats() as $prefix => $details) {
-            if ($record === false
+            if (
+                $record === false
                 || $record->getXML($prefix) !== false
                 || ('oai_vufind_json' === $prefix && $this->supportsVuFindMetadata())
             ) {
@@ -750,13 +793,13 @@ class Server
             $params = $this->listRecordsGetParams();
         } catch (\Exception $e) {
             $parts = explode(':', $e->getMessage(), 2);
-            if (count($parts) != 2) {
+            if (count($parts) != 2 || !in_array($parts[0], $this->legalErrorCodes)) {
                 throw $e;
             }
             return $this->showError($parts[0], $parts[1]);
         }
 
-        // Normalize the provided dates into Unix timestamps.  Depending on whether
+        // Normalize the provided dates into Unix timestamps. Depending on whether
         // they come from the OAI-PMH request or the database, the format may be
         // slightly different; this ensures they are reduced to a consistent value!
         $from = $this->normalizeDate($params['from']);
@@ -793,7 +836,15 @@ class Server
 
         // Figure out how many non-deleted records we need to display:
         $recordLimit = ($params['cursor'] + $this->pageSize) - $currentCursor;
-        $cursorMark = $params['cursorMark'] ?? '';
+        // Depending on cursormark mode, we either need to get the latest mark or
+        // else calculate a Solr offset.
+        if ($this->useCursorMark) {
+            $offset = $cursorMark = $params['cursorMark'] ?? '';
+        } else {
+            $cursorMark = ''; // always empty for checks below
+            $offset = ($currentCursor >= $deletedCount)
+                ? $currentCursor - $deletedCount : 0;
+        }
         $format = $params['metadataPrefix'];
 
         // Get non-deleted records from the Solr index:
@@ -801,7 +852,7 @@ class Server
         $result = $this->listRecordsGetNonDeleted(
             $from,
             $until,
-            $cursorMark,
+            $offset,
             $recordLimit,
             $format,
             $set
@@ -820,11 +871,16 @@ class Server
 
         // If our cursor didn't reach the last record, we need a resumption token!
         $listSize = $deletedCount + $nonDeletedCount;
-        if ($listSize > $currentCursor
+        if (
+            $listSize > $currentCursor
             && ('' === $cursorMark || $nextCursorMark !== $cursorMark)
         ) {
             $this->saveResumptionToken(
-                $xml, $params, $currentCursor, $listSize, $nextCursorMark
+                $xml,
+                $params,
+                $currentCursor,
+                $listSize,
+                $nextCursorMark
             );
         } elseif ($params['cursor'] > 0) {
             // If we reached the end of the list but there is more than one page, we
@@ -847,7 +903,8 @@ class Server
         // Resumption tokens are not currently supported for this verb:
         if ($this->hasParam('resumptionToken')) {
             return $this->showError(
-                'badResumptionToken', 'Invalid resumption token'
+                'badResumptionToken',
+                'Invalid resumption token'
             );
         }
 
@@ -862,7 +919,7 @@ class Server
 
         // Load set field if applicable:
         if (null !== $this->setField) {
-            // If we got this far, we can load all available set values.  For now,
+            // If we got this far, we can load all available set values. For now,
             // we'll assume that this list is short enough to load in one response;
             // it may be necessary to implement a resumption token mechanism if this
             // proves not to be the case:
@@ -905,15 +962,14 @@ class Server
      * @param int $until         End date.
      * @param int $currentCursor Offset into result set
      *
-     * @return \Laminas\Db\ResultSet\AbstractResultSet
+     * @return ChangeTrackerEntityInterface[]
      */
     protected function listRecordsGetDeleted($from, $until, $currentCursor)
     {
-        $tracker = $this->tableManager->get('ChangeTracker');
-        return $tracker->retrieveDeleted(
+        return $this->trackerService->getDeletedEntities(
             $this->core,
-            date('Y-m-d H:i:s', $from),
-            date('Y-m-d H:i:s', $until),
+            \DateTime::createFromFormat('U', $from),
+            \DateTime::createFromFormat('U', $until),
             $currentCursor,
             $this->pageSize
         );
@@ -929,28 +985,33 @@ class Server
      */
     protected function listRecordsGetDeletedCount($from, $until)
     {
-        $tracker = $this->tableManager->get('ChangeTracker');
-        return $tracker->retrieveDeletedCount(
+        return $this->trackerService->getDeletedCount(
             $this->core,
-            date('Y-m-d H:i:s', $from),
-            date('Y-m-d H:i:s', $until)
+            \DateTime::createFromFormat('U', $from),
+            \DateTime::createFromFormat('U', $until)
         );
     }
 
     /**
      * Get an array of information on non-deleted records in the specified range.
      *
-     * @param int    $from       Start date.
-     * @param int    $until      End date.
-     * @param string $cursorMark cursorMark for the position in the full result list.
-     * @param int    $limit      Max number of full records to return.
-     * @param string $format     Requested record format
-     * @param string $set        Set to limit to (empty string for none).
+     * @param int    $from   Start date.
+     * @param int    $until  End date.
+     * @param mixed  $offset Solr offset, or cursorMark for the position in the full
+     * result list (depending on settings).
+     * @param int    $limit  Max number of full records to return.
+     * @param string $format Requested record format
+     * @param string $set    Set to limit to (empty string for none).
      *
      * @return \VuFind\Search\Base\Results Search result object.
      */
-    protected function listRecordsGetNonDeleted($from, $until, $cursorMark, $limit,
-        $format, $set = ''
+    protected function listRecordsGetNonDeleted(
+        $from,
+        $until,
+        $offset,
+        $limit,
+        $format,
+        $set = ''
     ) {
         // Set up search parameters:
         $results = $this->resultsManager->get($this->searchClassId);
@@ -988,8 +1049,12 @@ class Server
         }
 
         // Perform a Solr search:
-        $results->overrideStartRecord(1);
-        $results->setCursorMark($cursorMark);
+        if ($this->useCursorMark) {
+            $results->overrideStartRecord(1);
+            $results->setCursorMark($offset);
+        } else {
+            $results->overrideStartRecord($offset + 1);
+        }
 
         // Return our results:
         return $results;
@@ -1026,7 +1091,8 @@ class Server
             // Set default date range if not already provided:
             if (empty($params['from'])) {
                 $params['from'] = $this->earliestDatestamp;
-                if (!empty($params['until'])
+                if (
+                    !empty($params['until'])
                     && strlen($params['from']) > strlen($params['until'])
                 ) {
                     $params['from'] = substr($params['from'], 0, 10);
@@ -1045,14 +1111,16 @@ class Server
 
         // If no set field is configured and a set parameter comes in, we have a
         // problem:
-        if (null === $this->setField && empty($this->setQueries)
+        if (
+            null === $this->setField && empty($this->setQueries)
             && !empty($params['set'])
         ) {
             throw new \Exception('noSetHierarchy:Sets not supported');
         }
 
         // Validate set parameter:
-        if (!empty($params['set']) && null === $this->setField
+        if (
+            !empty($params['set']) && null === $this->setField
             && !isset($this->setQueries[$params['set']])
         ) {
             throw new \Exception('badArgument:Invalid set specified');
@@ -1081,18 +1149,18 @@ class Server
      */
     protected function isBadDate($from, $until)
     {
-        $dt = \DateTime::createFromFormat("Y-m-d", substr($until, 0, 10));
-        if ($dt === false || array_sum($dt->getLastErrors())) {
+        $dt = \DateTime::createFromFormat('Y-m-d', substr($until, 0, 10));
+        if (!$this->dateTimeCreationSuccessful($dt)) {
             return true;
         }
-        $dt = \DateTime::createFromFormat("Y-m-d", substr($from, 0, 10));
-        if ($dt === false || array_sum($dt->getLastErrors())) {
+        $dt = \DateTime::createFromFormat('Y-m-d', substr($from, 0, 10));
+        if (!$this->dateTimeCreationSuccessful($dt)) {
             return true;
         }
-        //check for different date granularity
+        // Check for different date granularity
         if (strpos($from, 'T') && strpos($from, 'Z')) {
             if (strpos($until, 'T') && strpos($until, 'Z')) {
-                //this is good
+                // This is good
             } else {
                 return true;
             }
@@ -1112,6 +1180,28 @@ class Server
     }
 
     /**
+     * Check if a DateTime was successfully created without errors or warnings
+     *
+     * @param \DateTime|false $dt DateTime or false (return value of createFromFormat)
+     *
+     * @return bool
+     */
+    protected function dateTimeCreationSuccessful(\DateTime|false $dt): bool
+    {
+        // Return value false is always an error:
+        if (false === $dt) {
+            return false;
+        }
+        $errors = $dt->getLastErrors();
+        // getLastErrors returns false if no errors on PHP 8.2 and later:
+        if (false === $errors) {
+            return true;
+        }
+        // getLastErrors returns an array with no errors on PHP 8.1:
+        return empty($errors['errors']) && empty($errors['warnings']);
+    }
+
+    /**
      * Validate the from and until parameters for the listRecords method.
      *
      * @param int $from  Timestamp for start date.
@@ -1127,12 +1217,14 @@ class Server
         }
         if ($from > $until) {
             return $this->showError(
-                'badArgument', 'End date must be after start date'
+                'badArgument',
+                'End date must be after start date'
             );
         }
         if ($from < $this->normalizeDate($this->earliestDatestamp)) {
             return $this->showError(
-                'badArgument', 'Start date must be after earliest date'
+                'badArgument',
+                'Start date must be after earliest date'
             );
         }
 
@@ -1170,15 +1262,13 @@ class Server
      */
     protected function loadResumptionToken($token)
     {
-        // Create object for loading tokens:
-        $search = $this->tableManager->get('OaiResumption');
-
         // Clean up expired records before doing our search:
-        $search->removeExpired();
+        $this->resumptionService->removeExpired();
 
         // Load the requested token if it still exists:
-        if ($row = $search->findToken($token)) {
-            return $row->restoreParams();
+        if ($row = $this->resumptionService->findToken($token)) {
+            parse_str($row->getResumptionParameters(), $params);
+            return $params;
         }
 
         // If we got this far, the token is invalid or expired:
@@ -1234,7 +1324,11 @@ class Server
      *
      * @return void
      */
-    protected function saveResumptionToken($xml, $params, $currentCursor, $listSize,
+    protected function saveResumptionToken(
+        $xml,
+        $params,
+        $currentCursor,
+        $listSize,
         $cursorMark
     ) {
         // Save the old cursor position before overwriting it for storage in the
@@ -1244,9 +1338,8 @@ class Server
         $params['cursorMark'] = $cursorMark;
 
         // Save everything to the database:
-        $search = $this->tableManager->get('OaiResumption');
         $expire = time() + 24 * 60 * 60;
-        $token = $search->saveToken($params, $expire);
+        $token = $this->resumptionService->createAndPersistToken($params, $expire)->getId();
 
         // Add details to the xml:
         $token = $xml->addChild('resumptionToken', $token);
@@ -1324,9 +1417,8 @@ class Server
 
         // Prefix?  Strip it off and return the stripped version if valid:
         $prefix = 'oai:' . $this->idNamespace . ':';
-        $prefixLen = strlen($prefix);
-        if (!empty($prefix) && substr($id, 0, $prefixLen) == $prefix) {
-            return substr($id, $prefixLen);
+        if (str_starts_with($id, $prefix)) {
+            return substr($id, strlen($prefix));
         }
 
         // Invalid prefix -- unrecognized ID:

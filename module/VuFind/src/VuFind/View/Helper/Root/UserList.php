@@ -1,8 +1,9 @@
 <?php
+
 /**
  * List view helper
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -25,10 +26,14 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFind\View\Helper\Root;
 
-use Laminas\Session\Container;
 use Laminas\View\Helper\AbstractHelper;
+use VuFind\Db\Entity\UserEntityInterface;
+use VuFind\Db\Entity\UserListEntityInterface;
+use VuFind\Db\Service\UserListServiceInterface;
+use VuFind\Favorites\FavoritesService;
 
 /**
  * List view helper
@@ -42,30 +47,29 @@ use Laminas\View\Helper\AbstractHelper;
 class UserList extends AbstractHelper
 {
     /**
-     * List mode (enabled or disabled)
-     *
-     * @var string
-     */
-    protected $mode;
-
-    /**
-     * Session container for last list information.
-     *
-     * @var Container
-     */
-    protected $session;
-
-    /**
      * Constructor
      *
-     * @param Container $session Session container (must use same namespace as
-     * container provided to \VuFind\Db\Table\UserList)
-     * @param string    $mode    List mode (enabled or disabled)
+     * @param FavoritesService         $favoritesService Favorites service
+     * @param UserListServiceInterface $userListService  List database service
+     * @param string                   $mode             List mode (enabled or disabled)
      */
-    public function __construct(Container $session, $mode = 'enabled')
+    public function __construct(
+        protected FavoritesService $favoritesService,
+        protected UserListServiceInterface $userListService,
+        protected string $mode = 'enabled'
+    ) {
+    }
+
+    /**
+     * Get lists with counts for the provided user.
+     *
+     * @param UserEntityInterface $user User owning lists
+     *
+     * @return array
+     */
+    public function getUserListsAndCountsByUser(UserEntityInterface $user): array
     {
-        $this->mode = $mode;
-        $this->session = $session;
+        return $this->userListService->getUserListsAndCountsByUser($user);
     }
 
     /**
@@ -85,6 +89,19 @@ class UserList extends AbstractHelper
      */
     public function lastUsed()
     {
-        return $this->session->lastUsed ?? null;
+        return $this->favoritesService->getLastUsedList();
+    }
+
+    /**
+     * Is the provided user allowed to edit the provided list?
+     *
+     * @param ?UserEntityInterface    $user Logged-in user (null if none)
+     * @param UserListEntityInterface $list List to check
+     *
+     * @return bool
+     */
+    public function userCanEditList(?UserEntityInterface $user, UserListEntityInterface $list): bool
+    {
+        return $this->favoritesService->userCanEditList($user, $list);
     }
 }

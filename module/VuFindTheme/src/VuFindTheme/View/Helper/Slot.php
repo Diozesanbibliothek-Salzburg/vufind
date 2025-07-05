@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Slot view helper
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2019.
  *
@@ -25,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindTheme\View\Helper;
 
 /**
@@ -43,12 +45,12 @@ class Slot extends \Laminas\View\Helper\AbstractHelper
      *
      * @const string
      */
-    const SET   = 'SET';
-    const PREPEND = 'PREPEND';
-    const APPEND = 'APPEND';
+    public const SET   = 'SET';
+    public const PREPEND = 'PREPEND';
+    public const APPEND = 'APPEND';
 
     /**
-     * Storage for strings to be concatinated to the front of a block
+     * Storage for strings to be concatenated to the front of a block
      *
      * @var array of arrays
      */
@@ -62,7 +64,7 @@ class Slot extends \Laminas\View\Helper\AbstractHelper
     protected $blocks = [];
 
     /**
-     * Storage for strings to be concatinated to the end of a block
+     * Storage for strings to be concatenated to the end of a block
      *
      * @var array of arrays
      */
@@ -120,7 +122,7 @@ class Slot extends \Laminas\View\Helper\AbstractHelper
      * Prepends, blocks, and appends are separated byspacestopreventthisfromhappening
      *
      * Non-string data can be stored in a slot but prepend and append
-     * will cause it to be concatinated into a string.
+     * will cause it to be concatenated into a string.
      *
      * @param string $name Name of target block for action
      *
@@ -152,7 +154,7 @@ class Slot extends \Laminas\View\Helper\AbstractHelper
     {
         $name = array_pop($this->stack);
         $ret = $this->build($name);
-        return $ret === null ? $default : $ret;
+        return $ret ?? $default;
     }
 
     /**
@@ -228,7 +230,6 @@ class Slot extends \Laminas\View\Helper\AbstractHelper
     public function end($method = self::SET)
     {
         $method = strtoupper($method);
-        $ret = null;
         if ($method == self::SET) {
             $ret = $this->set(ob_get_contents());
         } elseif ($method == self::PREPEND) {

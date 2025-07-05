@@ -3,7 +3,7 @@
 /**
  * Search2 Controller
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Staats- und Universitätsbibliothek Hamburg 2018.
  *
@@ -26,6 +26,7 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org Main Page
  */
+
 namespace VuFind\Controller;
 
 use Laminas\ServiceManager\ServiceLocatorInterface;
@@ -59,9 +60,7 @@ class Search2Controller extends AbstractSolrSearch
      */
     protected function resultScrollerActive()
     {
-        $config = $this->serviceLocator->get(\VuFind\Config::class)
-            ->get('Search2');
-        return isset($config->Record->next_prev_navigation)
-            && $config->Record->next_prev_navigation;
+        $config = $this->getService(\VuFind\Config\PluginManager::class)->get('Search2');
+        return $config->Record->next_prev_navigation ?? false;
     }
 }

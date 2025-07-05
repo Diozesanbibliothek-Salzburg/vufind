@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Language command: add string using template.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,8 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Language;
 
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -40,15 +43,12 @@ use Symfony\Component\Console\Output\OutputInterface;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'language/addusingtemplate',
+    description: 'Template-based string builder'
+)]
 class AddUsingTemplateCommand extends AbstractCommand
 {
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'language/addusingtemplate';
-
     /**
      * Configure the command.
      *
@@ -57,7 +57,6 @@ class AddUsingTemplateCommand extends AbstractCommand
     protected function configure()
     {
         $this
-            ->setDescription('Template-based string builder')
             ->setHelp(
                 'Builds new language strings from existing ones using a template'
             )->addArgument(
@@ -86,7 +85,7 @@ class AddUsingTemplateCommand extends AbstractCommand
         $template = $input->getArgument('template');
 
         // Make sure a valid target has been specified:
-        list($targetDomain, $targetKey) = $this->extractTextDomain($target);
+        [$targetDomain, $targetKey] = $this->extractTextDomain($target);
         if (!($targetDir = $this->getLangDir($output, $targetDomain, true))) {
             return 1;
         }
@@ -96,10 +95,10 @@ class AddUsingTemplateCommand extends AbstractCommand
         $lookups = [];
         foreach ($matches[0] as $current) {
             $key = trim($current, '|');
-            list($sourceDomain, $sourceKey) = $this->extractTextDomain($key);
+            [$sourceDomain, $sourceKey] = $this->extractTextDomain($key);
             $lookups[$sourceDomain][$current] = [
                 'key' => $sourceKey,
-                'translations' => []
+                'translations' => [],
             ];
         }
 
@@ -107,9 +106,9 @@ class AddUsingTemplateCommand extends AbstractCommand
         foreach ($lookups as $domain => & $tokens) {
             $sourceDir = $this->getLangDir($output, $domain, false);
             if (!$sourceDir) {
-                return $this->getFailureResponse();
+                return 1;
             }
-            $sourceCallback = function ($full) use ($domain, & $tokens) {
+            $sourceCallback = function ($full) use (&$tokens) {
                 $strings = $this->reader->getTextDomain($full, false);
                 foreach ($tokens as & $current) {
                     $sourceKey = $current['key'];
@@ -124,7 +123,10 @@ class AddUsingTemplateCommand extends AbstractCommand
 
         // Fill in template, write results:
         $targetCallback = function ($full) use (
-            $output, $template, $targetKey, $lookups
+            $output,
+            $template,
+            $targetKey,
+            $lookups
         ) {
             $lang = basename($full);
             $in = $out = [];
@@ -139,7 +141,9 @@ class AddUsingTemplateCommand extends AbstractCommand
                 }
             }
             $this->addLineToFile(
-                $full, $targetKey, str_replace($in, $out, $template)
+                $full,
+                $targetKey,
+                str_replace($in, $out, $template)
             );
             $this->normalizer->normalizeFile($full);
         };

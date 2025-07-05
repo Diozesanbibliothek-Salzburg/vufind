@@ -3,7 +3,7 @@
 /**
  * Parameter bag.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2010.
  *
@@ -26,7 +26,13 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org
  */
+
 namespace VuFindSearch;
+
+use function count;
+use function in_array;
+use function is_array;
+use function sprintf;
 
 /**
  * Lightweight wrapper for request parameters.
@@ -81,7 +87,7 @@ class ParamBag implements \Countable
      *
      * @return int
      */
-    public function count()
+    public function count(): int
     {
         return count($this->params);
     }
@@ -146,20 +152,30 @@ class ParamBag implements \Countable
     /**
      * Add parameter value.
      *
-     * @param string $name  Parameter name
-     * @param mixed  $value Parameter value
+     * @param string $name        Parameter name
+     * @param mixed  $value       Parameter value
+     * @param bool   $deduplicate Deduplicate parameter values
      *
      * @return void
      */
-    public function add($name, $value)
+    public function add($name, $value, $deduplicate = true)
     {
         if (!isset($this->params[$name])) {
             $this->params[$name] = [];
         }
         if (is_array($value)) {
-            $this->params[$name] = array_merge($this->params[$name], $value);
+            $this->params[$name] = array_merge_recursive($this->params[$name], $value);
         } else {
             $this->params[$name][] = $value;
+        }
+        if ($deduplicate) {
+            // Avoid deduplicating associative array params (like Primo filterList):
+            foreach ($this->params[$name] as $key => $current) {
+                if (!is_numeric($key) || is_array($current)) {
+                    return;
+                }
+            }
+            $this->params[$name] = array_values(array_unique($this->params[$name]));
         }
     }
 
@@ -238,7 +254,9 @@ class ParamBag implements \Countable
                     array_map(
                         function ($value) use ($name) {
                             return sprintf(
-                                '%s=%s', urlencode($name), urlencode($value)
+                                '%s=%s',
+                                urlencode($name),
+                                urlencode($value ?? '')
                             );
                         },
                         $values

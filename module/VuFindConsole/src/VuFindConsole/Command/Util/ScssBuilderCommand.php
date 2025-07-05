@@ -1,8 +1,9 @@
 <?php
+
 /**
  * Console command: build CSS from SCSS.
  *
- * PHP version 7
+ * PHP version 8
  *
  * Copyright (C) Villanova University 2020.
  *
@@ -25,9 +26,10 @@
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+
 namespace VuFindConsole\Command\Util;
 
-use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Output\OutputInterface;
 use VuFindTheme\ScssCompiler;
 
@@ -40,15 +42,12 @@ use VuFindTheme\ScssCompiler;
  * @license  http://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development Wiki
  */
+#[AsCommand(
+    name: 'util/scssBuilder',
+    description: 'SCSS compiler'
+)]
 class ScssBuilderCommand extends AbstractCssBuilderCommand
 {
-    /**
-     * The name of the command (the part after "public/index.php")
-     *
-     * @var string
-     */
-    protected static $defaultName = 'util/scssBuilder';
-
     /**
      * Name of precompiler format
      *
