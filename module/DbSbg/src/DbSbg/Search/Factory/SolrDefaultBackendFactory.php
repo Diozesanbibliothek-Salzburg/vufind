@@ -43,63 +43,66 @@ class SolrDefaultBackendFactory extends
 
     /**
      * Create the SOLR connector.
+     * 
      * DbSbg: Returning the custom Solr connector. Using multiple id fields for
      * retrieving a sinlge record.
      *
      * @return \DbSbgSearch\Backend\Solr\Connector
      */
-    protected function createConnector()
-    {
-        $config = $this->config->get($this->mainConfig);
+    // protected function createConnector()
+    // {
+    //     $searchConfig = $this->config->get($this->searchConfig);
+    //     $defaultFields = $searchConfig->General->default_record_fields ?? '*';
 
-        // DbSbg: Get configuration for ID fields to use for retrieving single
-        // records
-        $searchConfig = $this->config->get($this->searchConfig);
-        $idFields = (
-                isset($searchConfig->RecordIdFields->idFields)
-                && !empty($searchConfig->RecordIdFields->idFields)
-            )
-            ? $searchConfig->RecordIdFields->idFields
-            : 'id'; // DbSbg: Default is "id" Solr field
-    	$this->uniqueKey = $idFields;
+    //     if (($searchConfig->Explain->enabled ?? false) && !str_contains($defaultFields, 'score')) {
+    //         $defaultFields .= ',score';
+    //     }
 
-        $handlers = [
-            'select' => [
-                'fallback' => true,
-                'defaults' => ['fl' => '*,score'],
-                'appends'  => ['fq' => []],
-            ],
-            'terms' => [
-                'functions' => ['terms'],
-            ],
-        ];
+    //     // DbSbg: Get configuration for ID fields to use for retrieving single
+    //     // records
+    //     $searchConfig = $this->config->get($this->searchConfig);
+    //     $idFields = (
+    //             isset($searchConfig->RecordIdFields->idFields)
+    //             && !empty($searchConfig->RecordIdFields->idFields)
+    //         )
+    //         ? $searchConfig->RecordIdFields->idFields
+    //         : 'id'; // DbSbg: Default is "id" Solr field
+    // 	$this->uniqueKey = $idFields;
 
-        foreach ($this->getHiddenFilters() as $filter) {
-            array_push($handlers['select']['appends']['fq'], $filter);
-        }
+    //     $handlers = [
+    //         'select' => [
+    //             'fallback' => true,
+    //             'defaults' => ['fl' => $defaultFields],
+    //             'appends'  => ['fq' => []],
+    //         ],
+    //         'terms' => [
+    //             'functions' => ['terms'],
+    //         ],
+    //     ];
 
-        // DbSbg: Use Connector from module DbSbgSearch.
-        // ATTENTION: The DbSbgSearch module must be added to the Apache config file
-        // setting "SetEnv" like this so that the class can be found:
-        // SetEnv VUFIND_LOCAL_MODULES DbSbg,DbSbgSearch,[other modules]
-        $connector = new \DbSbgSearch\Backend\Solr\Connector(
-            $this->getSolrUrl(),
-            new \VuFindSearch\Backend\Solr\HandlerMap($handlers),
-            $this->uniqueKey
-        );
+    //     foreach ($this->getHiddenFilters() as $filter) {
+    //         array_push($handlers['select']['appends']['fq'], $filter);
+    //     }
 
-        $connector->setTimeout(
-            isset($config->Index->timeout) ? $config->Index->timeout : 30
-        );
+    //     // DbSbg: Use Connector from module DbSbgSearch.
+    //     // ATTENTION: The DbSbgSearch module must be added to the Apache config file
+    //     // setting "SetEnv" like this so that the class can be found:
+    //     // SetEnv VUFIND_LOCAL_MODULES DbSbg,DbSbgSearch,[other modules]
+    //     $connector = new \DbSbgSearch\Backend\Solr\Connector(
+    //         $this->getSolrUrl(),
+    //         new \VuFindSearch\Backend\Solr\HandlerMap($handlers),
+    //         $this->uniqueKey
+    //     );
 
-        if ($this->logger) {
-            $connector->setLogger($this->logger);
-        }
-        if ($this->serviceLocator->has(\VuFindHttp\HttpService::class)) {
-            $connector->setProxy(
-                $this->serviceLocator->get(\VuFindHttp\HttpService::class)
-            );
-        }
-        return $connector;
-    }
+    //     if ($this->logger) {
+    //         $connector->setLogger($this->logger);
+    //     }
+
+    //     if ($cache = $this->createConnectorCache($searchConfig)) {
+    //         $connector->setCache($cache);
+    //     }
+
+    //     return $connector;
+    // }
+
 }

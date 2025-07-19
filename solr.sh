@@ -97,4 +97,14 @@ then
 fi
 
 export SOLR_LOGS_DIR=$SOLR_LOGS_DIR
-"$SOLR_BIN/solr" "$1" ${SOLR_ADDITIONAL_START_OPTIONS} -p "$SOLR_PORT" -s "$SOLR_HOME" -m "$SOLR_HEAP" -a "-Ddisable.configEdit=true -Dsolr.log=$SOLR_LOGS_DIR -Dsolr.config.lib.enabled=true $SOLR_ADDITIONAL_JVM_OPTIONS"
+
+# RADIX LAB: Original command
+#"$SOLR_BIN/solr" "$1" ${SOLR_ADDITIONAL_START_OPTIONS} -p "$SOLR_PORT" -s "$SOLR_HOME" -m "$SOLR_HEAP" -a "-Ddisable.configEdit=true -Dsolr.log=$SOLR_LOGS_DIR -Dsolr.config.lib.enabled=true $SOLR_ADDITIONAL_JVM_OPTIONS"
+
+# RADIX LAB: Changed "status" command due to new Solr version that is not accepting other CLI options than "-p" and "-s" (which are mutually exclusive)
+if [ "$1" = "status" ]; then
+	"$SOLR_BIN/solr" "$1" -p "$SOLR_PORT"
+else
+	"$SOLR_BIN/solr" "$1" ${SOLR_ADDITIONAL_START_OPTIONS} -p "$SOLR_PORT" -s "$SOLR_HOME" -m "$SOLR_HEAP" -a "-Ddisable.configEdit=true -Dsolr.log=$SOLR_LOGS_DIR -Dsolr.config.lib.enabled=true $SOLR_ADDITIONAL_JVM_OPTIONS"
+fi
+

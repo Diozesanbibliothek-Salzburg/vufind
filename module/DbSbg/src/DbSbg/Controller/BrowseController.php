@@ -113,6 +113,7 @@ class BrowseController extends \VuFind\Controller\BrowseController
                     )
                 ];
         }
+        throw new \Exception('Unexpected value: ' . $facet);
     }
 
     /**

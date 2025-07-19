@@ -68,8 +68,8 @@ class SolrMarc extends \VuFind\RecordDriver\SolrMarc
     public function getAcNo() {
         $acNo = $this->fields['acNo_txt'] ?? null;
         if ($acNo == null || empty($acNo)) {
-            $acNo = ($this->getMarcRecord()->getField('009'))
-                ? $this->getMarcRecord()->getField('009')->getData()
+            $acNo = ($this->getMarcReader()->getField('009'))
+                ? $this->getMarcReader()->getField('009')
                 : null;
         }
         return $acNo;

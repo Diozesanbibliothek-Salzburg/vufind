@@ -15,10 +15,12 @@ body {
 
 // Colored backgroud for search box
 .dbSbgSearchboxBackground {
+  display: flex;
+  flex-direction: row;
   // Background color
   background: none repeat scroll 0 0 #B39843;
 
-  // Padding top and bottom of red bar
+  // Padding top and bottom of search bar
   padding: 8px 0 8px 0;
 
   // 100% viewport width
@@ -34,10 +36,9 @@ body {
 }
 
 #searchForm {
-  // Stretching the whole form with the searchbox in the red bar
-  width: 100%;
+  // Stretching the whole form with the searchbox in the search bar
+  width: 85vw;
 }
-
 
 // Styling search button
 #searchForm .btn-primary {
@@ -101,6 +102,12 @@ body {
     outline: none;
 }
 
+// Shaddow of focused fields
+form .form-control:focus {
+  border-color: inherit;
+}
+
+
 @media (min-width:768px) {
   .container {
       // Overall width
@@ -108,10 +115,17 @@ body {
       
   }
 
+  .searchForm .searchForm-query {
+    width: 30%;
+  }
+
+  
   .dbSbgSearchboxBackground #searchForm_lookfor {
       // Stretching the searchbox
-      width: 40%;
+      width: 100%;
+      max-width: none;
   }
+  
 
 }
 

@@ -47,6 +47,7 @@ class Bootstrapper extends \VuFind\Bootstrapper
    *
    * @return void
    */
+  /*
   protected function initConfig()
   {
       // Create the configuration manager:
@@ -54,6 +55,7 @@ class Bootstrapper extends \VuFind\Bootstrapper
       $sm = $app->getServiceManager();
       $this->config = $sm->get(\VuFind\Config\PluginManager::class)->get('config');
   }
+  */
 
   /**
    * Set up theme handling.
@@ -63,7 +65,7 @@ class Bootstrapper extends \VuFind\Bootstrapper
    *
    * @return void
    */
-  protected function initTheme()
+  protected function initTheme(): void
   {
       // Attach remaining theme configuration to the dispatch event at high
       // priority (TODO: use priority constant once defined by framework):

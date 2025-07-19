@@ -27,9 +27,7 @@
  */
 namespace DbSbg\ILS\Driver;
 
-use Laminas\Http\Headers;
-use SimpleXMLElement;
-use VuFind\Exception\ILS as ILSException;
+use VuFind\Marc\MarcReader;
 
 /**
  * Customized Alma ILS Driver
@@ -68,8 +66,7 @@ class Alma extends \VuFind\ILS\Driver\Alma
 
         // Prepare result array with default values. If no API result can be received
         // these will be returned.
-        $results['total'] = 0;
-        $results['holdings'] = [];
+        $results = ['total' => 0, 'holdings' => []];
 
         // Correct copy count in case of paging
         $copyCount = $options['offset'] ?? 0;
@@ -80,17 +77,17 @@ class Alma extends \VuFind\ILS\Driver\Alma
         // use a paginator for paging through many items.
         $apiPagingParams = '';
         if ($options['itemLimit'] ?? null) {
-            $apiPagingParams = 'limit=' . urlencode($options['itemLimit'])
+            $apiPagingParams = '&limit=' . urlencode($options['itemLimit'])
                 . '&offset=' . urlencode($options['offset'] ?? 0);
         }
 
         // The path for the API call. We call "ALL" available items, but not at once
         // as a pagination mechanism is used. If paging params are not set for some
         // reason, the first 10 items are called which is the default API behaviour.
-        $itemsPath = '/bibs/' . rawurlencode($id) . '/holdings/ALL/items?'
-            . $apiPagingParams
-            . '&order_by=library,location,enum_a,enum_b&direction=desc'
-            . '&expand=due_date';
+        $itemsPath = '/bibs/' . rawurlencode($id) . '/holdings/ALL/items'
+            . '?order_by=library,location,enum_a,enum_b&direction=desc'
+            . '&expand=due_date'
+            . $apiPagingParams;
 
         if ($items = $this->makeRequest($itemsPath)) {
             // Get the total number of items returned from the API call and set it to
@@ -110,6 +107,7 @@ class Alma extends \VuFind\ILS\Driver\Alma
                 if ($duedate && 'Item not in place' === $status) {
                     $status = 'Checked Out';
                 }
+                [$available, $status] = $this->getItemAvailabilityAndStatus($item);
 
                 $itemNotes = !empty($item->item_data->public_note)
                     ? [(string)$item->item_data->public_note] : null;
@@ -136,7 +134,8 @@ class Alma extends \VuFind\ILS\Driver\Alma
                 $results['holdings'][] = [
                     'id' => $id,
                     'source' => 'Solr',
-                    'availability' => $this->getAvailabilityFromItem($item),
+                    //'availability' => $this->getAvailabilityFromItem($item),
+                    'availability' => $available,
                     'status' => $status,
                     'location' => $this->getItemLocation($item),
                     'reserve' => 'N',   // TODO: support reserve status
@@ -149,7 +148,8 @@ class Alma extends \VuFind\ILS\Driver\Alma
                     'barcode' => empty($barcode) ? null : $barcode,
                     'item_notes' => $itemNotes ?? null,
                     'item_id' => $itemId,
-                    'holding_id' => $holdingId,
+                    'holdings_id' => $holdingId,
+                    'holding_id' => $holdingId, // deprecated, retained for backward compatibility
                     'holdtype' => 'auto',
                     'addLink' => $patron ? 'check' : false,
                     // For Alma title-level hold requests
@@ -247,136 +247,116 @@ class Alma extends \VuFind\ILS\Driver\Alma
                     // Get the single MARC holding record based on the holding ID
                     if ($marcHol = $this->makeRequest($holdingsPath.'/'.$holId)) {
                         if ($marcHol != null && !empty($marcHol)) {
-                            
                             if (isset($marcHol->record)) {
-                                // Get the holdings record from the API as a
-                                // File_MARCXML object for better processing below.
-                                $marc = new \File_MARCXML(
-                                    $marcHol->record->asXML(),
-                                    \File_MARCXML::SOURCE_STRING
-                                );
-
-                                // Read the Marc holdings record
-                                if ($marcRec = $marc->next()) {
+                                // Get MarcReader from API MarcXML record
+                                $marc = new MarcReader($marcHol->record->asXML());
+                                //var_dump($marc);
                                     
-                                    // Get values only if we have an 866 field.
-                                    if ($fs866 = $marcRec->getFields('866')) {
-                                        $libCodes = null;
-                                        $locCodes = null;
-                                        $callNo = null;
-                                        $callNoNote = null;
-                                        $sumHoldings = null;
-                                        $gaps = null;
-                                        $sumHoldingsPrefix = null;
-                                        $sumHoldingsNote = null;
+                                // Get values only if we have an 866 field.
+                                if ($fs866 = $marc->getFields('866')) {
+                                    $libCodes = null;
+                                    $locCodes = null;
+                                    $callNo = null;
+                                    $callNoNote = null;
+                                    $sumHoldings = null;
+                                    $gaps = null;
+                                    $sumHoldingsPrefix = null;
+                                    $sumHoldingsNote = null;
+                                    
+                                    // Process 852 field(s)
+                                    if ($fs852 = $marc->getFields('852')) {
+                                        // Iterate over all 852 fields available
                                         
-                                        // Process 852 field(s)
-                                        if ($fs852 = $marcRec->getFields('852')) {
-                                            // Iterate over all 852 fields available
-                                            foreach ($fs852 as $f852) {
-                                                // Check if ind1 is '8'. We only
-                                                // process these fields
-                                                if ($f852->getIndicator('1')=='8') {
-                                                    // Add data from subfields to
-                                                    // arrays as their key for having
-                                                    // unique values. We just use
-                                                    // 'true' as array values.
-                                                    foreach ($f852->getSubfields('b')
-                                                        as $f852b) {
-                                                        $libCodes[$f852b
-                                                            ->getData()] = true;
-                                                    }
-                                                    foreach ($f852->getSubfields('c')
-                                                        as $f852c) {
-                                                        $locCodes[$f852c
-                                                            ->getData()] = true;
-                                                    }
-                                                    foreach ($f852->getSubfields('h')
-                                                        as $f852h) {
-                                                        $callNo[$f852h
-                                                            ->getData()] = true;
-                                                    }
-                                                    foreach ($f852->getSubfields('z')
-                                                        as $f852z) {
-                                                        $callNoNote[$f852z
-                                                            ->getData()] = true;
-                                                    }
+                                        foreach ($fs852 as $f852) {
+                                            
+                                            // Check if ind1 is '8'. We only
+                                            // process these fields
+                                            if ($f852['i1'] == '8') {
+                                                
+                                                // Add data from subfields to
+                                                // arrays as their key for having
+                                                // unique values. We just use
+                                                // 'true' as array values.
+                                                foreach ($marc->getSubfields($f852, 'b') as $f852b) {
+                                                    $libCodes[$f852b] = true;
+                                                }
+                                                foreach ($marc->getSubfields($f852, 'c') as $f852c) {
+                                                    $locCodes[$f852c] = true;
+                                                }
+                                                foreach ($marc->getSubfields($f852, 'h') as $f852h) {
+                                                    $callNo[$f852h] = true;
+                                                }
+                                                foreach ($marc->getSubfields($f852, 'z') as $f852z) {
+                                                    $callNoNote[$f852z] = true;
                                                 }
                                             }
                                         }
-
-                                        // Iterate over all 866 fields available
-                                        foreach ($fs866 as $f866) {
-                                            // Check if ind1 is '3'
-                                            if ($f866->getIndicator('1') == '3') {
-                                                foreach ($f866->getSubfields('a')
-                                                    as $f86630a) {
-                                                    $sumHoldings[$f86630a
-                                                        ->getData()] = true;
-                                                }
-                                                foreach ($f866->getSubfields('z')
-                                                    as $f86630z) {
-                                                    $gaps[$f86630z
-                                                        ->getData()] = true;
-                                                }
-                                            }
-                                            // Check if ind1 is 'blank'
-                                            if ($f866->getIndicator('1') == ' ') {
-                                                foreach ($f866->getSubfields('a')
-                                                    as $f866_0a) {
-                                                    $sumHoldingsPrefix[$f866_0a
-                                                        ->getData()] = true;
-                                                }
-                                                foreach ($f866->getSubfields('z')
-                                                    as $f866_0z) {
-                                                    $sumHoldingsNote[$f866_0z
-                                                        ->getData()] = true;
-                                                }
-                                            }
-                                        }
-
-                                        // DbSbg: Get library and location names from
-                                        // Alma config API
-                                        $libNames = [];
-                                        $locNames = [];
-                                        if ($libCodes && $locCodes) {
-                                            $libConfs = [];
-                                            foreach (array_keys($libCodes) as
-                                                $libCode) {
-                                                $libConfs[] =
-                                                    $this->getLocationData($libCode);
-                                            }
-
-                                            foreach ($libConfs as
-                                                $libConf) {                                        
-                                                foreach (array_keys($locCodes) as
-                                                    $locCode) { 
-                                                    $locConf =
-                                                        $libConf[$locCode]
-                                                        ?? null;
-                                                    $libNames[] =
-                                                        $locConf['library_name']
-                                                        ?? null;
-                                                    $locNames[] =
-                                                        $locConf['external_name']
-                                                        ?: $locConf['name']
-                                                        ?? null;
-                                                }
-                                            }
-                                        }
-                                        
-                                        $summarizedHoldings[] = [
-                                            'library' => (!empty($libNames)) ? implode(', ', array_filter($libNames)) : null,
-                                            'location' => (!empty($locNames)) ? implode(', ', array_filter($locNames)) : 'UNASSIGNED',
-                                            'callnumber' => ($callNo) ? implode(', ', array_keys($callNo)) : null,
-                                            'callnumber_notes' => ($callNoNote) ? array_keys($callNoNote) : null,
-                                            'holdings_available' => ($sumHoldings) ? implode(', ', array_keys($sumHoldings)) : null,
-                                            'gaps' => ($gaps) ? array_keys($gaps) : null,
-                                            'holdings_prefix' => ($sumHoldingsPrefix) ? implode(', ', array_keys($sumHoldingsPrefix)) : null,
-                                            'holdings_notes' => ($sumHoldingsNote) ? array_keys($sumHoldingsNote) : null,
-                                        ];
                                     }
+
+                                    // Iterate over all 866 fields available
+                                    foreach ($fs866 as $f866) {
+                                        // Check if ind1 is '3'
+                                        if ($f866['i1'] == '3') {
+                                            foreach ($marc->getSubfields($f866, 'a') as $f86630a) {
+                                                $sumHoldings[$f86630a] = true;
+                                            }
+                                            foreach ($marc->getSubfields($f866, 'z') as $f86630z) {
+                                                $gaps[$f86630z] = true;
+                                            }
+                                        }
+                                        // Check if ind1 is 'blank'
+                                        if ($f866['i1'] == ' ') {
+                                            foreach ($marc->getSubfields($f866, 'a') as $f866_0a) {
+                                                $sumHoldingsPrefix[$f866_0a] = true;
+                                            }
+                                            foreach ($marc->getSubfields($f866, 'z') as $f866_0z) {
+                                                $sumHoldingsNote[$f866_0z] = true;
+                                            }
+                                        }
+                                    }
+
+                                    // DbSbg: Get library and location names from
+                                    // Alma config API
+                                    $libNames = [];
+                                    $locNames = [];
+                                    if ($libCodes && $locCodes) {
+                                        $libConfs = [];
+                                        foreach (array_keys($libCodes) as
+                                            $libCode) {
+                                            $libConfs[] =
+                                                $this->getLocationData($libCode);
+                                        }
+
+                                        foreach ($libConfs as
+                                            $libConf) {                                        
+                                            foreach (array_keys($locCodes) as
+                                                $locCode) { 
+                                                $locConf =
+                                                    $libConf[$locCode]
+                                                    ?? null;
+                                                $libNames[] =
+                                                    $locConf['library_name']
+                                                    ?? null;
+                                                $locNames[] =
+                                                    $locConf['external_name']
+                                                    ?: $locConf['name']
+                                                    ?? null;
+                                            }
+                                        }
+                                    }
+                                    
+                                    $summarizedHoldings[] = [
+                                        'library' => (!empty($libNames)) ? implode(', ', array_filter($libNames)) : null,
+                                        'location' => (!empty($locNames)) ? implode(', ', array_filter($locNames)) : 'UNASSIGNED',
+                                        'callnumber' => ($callNo) ? implode(', ', array_keys($callNo)) : null,
+                                        'callnumber_notes' => ($callNoNote) ? array_keys($callNoNote) : null,
+                                        'holdings_available' => ($sumHoldings) ? implode(', ', array_keys($sumHoldings)) : null,
+                                        'gaps' => ($gaps) ? array_keys($gaps) : null,
+                                        'holdings_prefix' => ($sumHoldingsPrefix) ? implode(', ', array_keys($sumHoldingsPrefix)) : null,
+                                        'holdings_notes' => ($sumHoldingsNote) ? array_keys($sumHoldingsNote) : null,
+                                    ];
                                 }
+                                
                             }
                         }
                     }

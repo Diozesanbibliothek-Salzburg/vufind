@@ -41,9 +41,10 @@ $config = [
   ],
   'vufind' => [
     'plugin_managers' => [
+        
         'ils_driver' => [
             'factories' => [
-                'DbSbg\ILS\Driver\Alma' => 'VuFind\ILS\Driver\AlmaFactory'
+                'DbSbg\ILS\Driver\Alma' => 'VuFind\ILS\Driver\DriverWithDateConverterFactory'
             ],
             'aliases' => [
                 'VuFind\ILS\Driver\Alma' => 'DbSbg\ILS\Driver\Alma'

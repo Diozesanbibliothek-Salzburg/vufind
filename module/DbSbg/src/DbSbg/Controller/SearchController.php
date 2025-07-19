@@ -47,22 +47,22 @@ class SearchController extends \VuFind\Controller\SearchController
      */
     public function exportAction() {
 
-        $view = $this->createViewModel();
+        $view = $this->createViewModel();        
 
         if ($this->formWasSubmitted('submitExportSearchResults')) {
 
             // Get all request params
-            $request = new \Laminas\Stdlib\Parameters(
-                $this->getRequest()->getQuery()->toArray()
-                + $this->getRequest()->getPost()->toArray()
-            );
-
+            $requestRaw = $this->getRequest()->getQuery()->toArray()
+              + $this->getRequest()->getPost()->toArray();
+            $httpUri = new \Laminas\Uri\Http($requestRaw['lightboxParent']);
+            $request = $httpUri->getQueryAsArray();
+            
             // Set page always to 1 for the start
             $request['page'] = '1';
 
             // Set a higher limit for faster pagination
             $request['limit'] = 200;
-            
+           
             // Get search runner
             $runner =
                 $this->serviceLocator->get(\VuFind\Search\SearchRunner::class);
@@ -97,7 +97,7 @@ class SearchController extends \VuFind\Controller\SearchController
             $file = fopen($filepath, 'a');
 
             // Define the headings for the CSV
-            $headings[] = ['mmsid', 'ACNo', 'Title', /*'containerTitle',*/
+            $headings[] = ['mmsid', 'ACNo', 'Title',
                 'Authors', 'place', 'Publisher', 'Date', 'holdingData'];
             
             // Translate headings

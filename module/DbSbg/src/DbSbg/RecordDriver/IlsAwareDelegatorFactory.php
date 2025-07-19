@@ -27,8 +27,8 @@
  */
 namespace DbSbg\RecordDriver;
 
-use Interop\Container\ContainerInterface;
-use Laminas\ServiceManager\Factory\DelegatorFactoryInterface;
+use Psr\Container\ContainerInterface;
+use function call_user_func;
 
 /**
  * Customized ILS aware delegator factory
@@ -54,8 +54,11 @@ class IlsAwareDelegatorFactory extends \VuFind\RecordDriver\IlsAwareDelegatorFac
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function __invoke(ContainerInterface $container, $name,
-        callable $callback, array $options = null
+    public function __invoke(
+        ContainerInterface $container,
+        $name,
+        callable $callback,
+        array $options = null
     ) {
         $driver = call_user_func($callback);
 

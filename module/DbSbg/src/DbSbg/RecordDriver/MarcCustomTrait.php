@@ -27,6 +27,8 @@
  */
 namespace DbSbg\RecordDriver;
 
+use VuFind\Log\Logger;
+
 /**
  * Custom functions to add MARC-driven functionality to already built in traits.
  *
@@ -85,21 +87,35 @@ trait MarcCustomTrait
     public function getExportData() {
         $exportData = [];
 
-        $hols = $this->getMarcRecord()->getFields('HOL');
+        // Get a marc reader
+        /** @var \VuFind\Marc\MarcReader */
+        $marc = $this->getMarcReader();
+
+        // Get the HOL fields
+        $hols = $marc->getFields('HOL');
+
         if (!empty($hols)) {
             foreach ($hols as $hol) {
-                $holPid = $this->getSubfieldData($hol->getSubfield('8'));
+                //var_dump($hol);
 
-                $ind1 = $hol->getIndicator('1');
+                // Get the PID of the holding
+                //$holPid = $this->getSubfieldData($hol->getSubfield('8'));
+                $holPid = $marc->getSubfield($hol, '8');
+                
+                // Get indicator 1
+                $ind1 = $hol['i1'];
 
                 if ($ind1 == '8') {
                     $locationCode =
-                        $this->getSubfieldData($hol->getSubfield('c'));
+                        //$this->getSubfieldData($hol->getSubfield('c'));
+                        $marc->getSubfield($hol, 'c');
                     if ($locationCode != 'UNASSIGNED') {
                         $libraryCode =
-                            $this->getSubfieldData($hol->getSubfield('b'));
+                            //$this->getSubfieldData($hol->getSubfield('b'));
+                            $marc->getSubfield($hol, 'b');
                         $callnumber =
-                            $this->getSubfieldData($hol->getSubfield('h'));
+                            //$this->getSubfieldData($hol->getSubfield('h'));
+                            $marc->getSubfield($hol, 'h');
 
                         // Get human readable library and location name
                         $library = null;
@@ -128,8 +144,10 @@ trait MarcCustomTrait
                 }
 
                 if ($ind1 == '3') {
-                    $holding = $this->getSubfieldData($hol->getSubfield('a'));
-                    $gaps = $this->getSubfieldData($hol->getSubfield('z'));
+                    //$holding = $this->getSubfieldData($hol->getSubfield('a'));
+                    $holding = $marc->getSubfield($hol, 'a');
+                    //$gaps = $this->getSubfieldData($hol->getSubfield('z'));
+                    $gaps = $marc->getSubfield($hol, 'z');
 
                     $exportData[$holPid]['holding'] = $holding;
                     $exportData[$holPid]['gaps'] = $gaps;
@@ -142,7 +160,7 @@ trait MarcCustomTrait
         // Get item data - keep for reference
         // TEST BEFORE USE IN PRODUCTION!
         /*
-        $itms = $this->getMarcRecord()->getFields('ITM');
+        $itms = $this->getMarcReader()->getFields('ITM');
         if (!empty($itms)) {
             foreach ($itms as $itm) {
                 $holPid = $this->getSubfieldData($itm->getSubfield('G'));
@@ -171,18 +189,45 @@ trait MarcCustomTrait
     }
 
     /**
-     * Get data from a given single subfield as string or null if subfield
-     * doesn't exist.
-     *
-     * @param \File_MARC_Subfield $subfield
+     * Get all subject headings associated with this record. Each heading is
+     * returned as an array of chunks, increasing from least specific to most
+     * specific.
      * 
-     * @return string|null
+     * DbSbg: Remove values that begin with "Automatisch aus GBV ..."
+     *
+     * @param bool $extended Whether to return a keyed array with the following
+     * keys:
+     * - heading: the actual subject heading chunks
+     * - type: heading type
+     * - source: source vocabulary
+     *
+     * @return array
      */
-    protected function getSubfieldData($subfield) {
-        if ($subfield) {
-            return $subfield->getData();
+    public function getAllSubjectHeadings($extended = false)
+    {
+        if (($this->mainConfig->Record->marcSubjectHeadingsSort ?? '') === 'numerical') {
+            $returnValues = $this->getAllSubjectHeadingsNumericalOrder($extended);
+        } else {
+            // Default | value === 'record'
+            $returnValues = $this->getAllSubjectHeadingsRecordOrder($extended);
         }
-        return null;
+
+        // DbSbg: Remove "Automatisch aus GBV ..." from the subject terms
+        $returnValuesClean = [];
+        foreach ($returnValues as $returnValue) {
+            $returnValuesClean[] = array_filter(
+                $returnValue,
+                fn($value) => !str_starts_with($value, 'Automatisch aus GBV')
+            );
+        }
+        // DbSbg: Re-index the array 
+        $returnValues = array_values($returnValuesClean);
+
+        // Remove duplicates and then send back everything we collected:
+        return array_map(
+            'unserialize',
+            array_unique(array_map('serialize', $returnValues))
+        );
     }
 
     /**
