@@ -28,6 +28,7 @@
 namespace DbSbgSearch\Backend\Solr;
 
 use VuFindSearch\ParamBag;
+use VuFindSearch\Backend\Exception\RequestErrorException;
 
 
 /**
@@ -51,14 +52,14 @@ class Connector extends \VuFindSearch\Backend\Solr\Connector
      *
      * @return string
      */
-    // public function getUniqueKey() {
-    // 	$uKey = 'id';
-    // 	if ($this->uniqueKey != null && !empty($this->uniqueKey)) {
-	  //   	$idFieldsArr = preg_split('/\s*,\s*/', $this->uniqueKey);
-	  //   	$uKey = (in_array('id', $idFieldsArr)) ? 'id' : $idFieldsArr[0];
-    // 	}
-    //   return $uKey;
-    // }
+    public function getUniqueKey() {
+    	$uKey = 'id';
+    	if ($this->uniqueKey != null && !empty($this->uniqueKey)) {
+	    	$idFieldsArr = preg_split('/\s*,\s*/', $this->uniqueKey);
+	    	$uKey = (in_array('id', $idFieldsArr)) ? 'id' : $idFieldsArr[0];
+    	}
+        return $uKey;
+    }
 
     /**
      * Return document specified by id.
@@ -70,18 +71,19 @@ class Connector extends \VuFindSearch\Backend\Solr\Connector
      *
      * @return string
      */
-    // public function retrieve($id, ParamBag $params = null)
-    // {
-    //   // DbSbg: Use query string for multiple ID searches.
-    //   $queryString = $this->getMultipleIdQueryString($id);
-    //   $params = $params ?: new ParamBag();
-    //   $params->set('q', $queryString);
+    public function retrieve($id, ParamBag $params = null)
+    {
+        // DbSbg: Use query string for multiple ID searches.
+        $queryString = $this->getMultipleIdQueryString($id);
 
-    //   $handler = $this->map->getHandler(__FUNCTION__);
-    //   $this->map->prepare(__FUNCTION__, $params);
+        $params = $params ?: new ParamBag();
+        $params->set('q', $queryString);
 
-    //   return $this->query($handler, $params);
-    // }
+        $handler = $this->map->getHandler(__FUNCTION__);
+        $this->map->prepare(__FUNCTION__, $params);
+
+        return $this->query($handler, $params);
+    }
 
     /**
      * Return records similar to a given record specified by id.
@@ -99,16 +101,25 @@ class Connector extends \VuFindSearch\Backend\Solr\Connector
      *
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    // public function similar($id, ParamBag $params)
-    // {
-    //     // DbSbg: Use query string for multiple ID searches.
-    //     $queryString = $this->getMultipleIdQueryString($id);
-    //     $params->set('q', $queryString);
+    public function similar($id, ParamBag $params)
+    {
+        // DbSbg: Use query string for multiple ID searches.
+        $queryString = $this->getMultipleIdQueryString($id);
+        $params->set('q', $queryString);
 
-    //     $handler = $this->map->getHandler(__FUNCTION__);
-    //     $this->map->prepare(__FUNCTION__, $params);
-    //     return $this->query($handler, $params);
-    // }
+        $handler = $this->map->getHandler(__FUNCTION__);
+        $this->map->prepare(__FUNCTION__, $params);
+        
+        try {
+            return $this->query($handler, $params, true);
+        } catch (RequestErrorException $e) {
+            // If Solr was unable to fetch the record, just act like we have no similar records:
+            if (str_contains($e->getMessage(), 'Could not fetch document with id')) {
+                return '{}';
+            }
+            throw $e;
+        }
+    }
 
     /**
      * DbSbg: Get a query string that searches in multiple ID fields (ORed together).
@@ -117,19 +128,19 @@ class Connector extends \VuFindSearch\Backend\Solr\Connector
      * 
      * @return string       The query string for a search in multiple ID fields
      */
-    // protected function getMultipleIdQueryString(string $id) {
-    //   // DbSbg: Use possible ID fields that are defined in [RecordIdFields]->
-    //   // idFields config in searches.ini and split them into an array.
-    //   $idFieldsArr = preg_split('/\s*,\s*/', $this->uniqueKey);
+    protected function getMultipleIdQueryString(string $id) {
+        // DbSbg: Use possible ID fields that are defined in [RecordIdFields]->
+        // idFields config in searches.ini and split them into an array.
+        $idFieldsArr = preg_split('/\s*,\s*/', $this->uniqueKey);
         
-    //   // DbSbg: Construct a solr query string that ORs together the ID fields. This
-    //   // query string can be used in the search query.
-    // 	$solrQueryStrings = [];
-    // 	foreach ($idFieldsArr as $uKey) {
-    //         $solrQueryStrings[] = sprintf('%s:"%s"', $uKey, addcslashes($id, '"'));
-    // 	}
-    //     $solrQueryString = implode(' || ', $solrQueryStrings);
+        // DbSbg: Construct a solr query string that ORs together the ID fields. This
+        // query string can be used in the search query.
+    	$solrQueryStrings = [];
+    	foreach ($idFieldsArr as $uKey) {
+            $solrQueryStrings[] = sprintf('%s:"%s"', $uKey, addcslashes($id, '"'));
+    	}
+        $solrQueryString = implode(' || ', $solrQueryStrings);
         
-    //     return $solrQueryString;
-    // }
+        return $solrQueryString;
+    }
 }
