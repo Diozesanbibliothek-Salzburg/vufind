@@ -83,7 +83,7 @@ class SearchController extends \VuFind\Controller\SearchController
             // "> /dev/null 2>&1 &" ensures PHP doesn't wait for output
             $cmd = "VUFIND_HOME=/opt/vufind VUFIND_LOCAL_DIR=/opt/vufind/local "
                 . "VUFIND_LOCAL_MODULES=\"DbSbg,DbSbgSearch,DbSbgTheme,DbSbgConsole\" "
-                . "nohup php " . APPLICATION_PATH . "/public/index.php export/export_csv "
+                . "nohup nice -n 19 php " . APPLICATION_PATH . "/public/index.php export/export_csv "
                 . escapeshellarg($paramsFile) . " "
                 . escapeshellarg($outputFile) . " "
                 . escapeshellarg($jobId) . " > " . escapeshellarg($debugFile)

@@ -230,6 +230,8 @@ class ExportCsvCommand extends Command implements TranslatorAwareInterface
             
             set_time_limit(0);
             gc_collect_cycles();
+
+            usleep(100000); // 0.1 second pause to reduce server load
         }
 
         // Close file
