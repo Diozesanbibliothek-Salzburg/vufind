@@ -41,7 +41,14 @@ $config = [
   ],
   'vufind' => [
     'plugin_managers' => [
-        
+        'ajaxhandler' => [
+            'factories' => [
+                'DbSbg\AjaxHandler\GetExportStatus' => 'DbSbg\AjaxHandler\GetExportStatusFactory'
+            ],
+            'aliases' => [
+                'getExportStatus' => 'DbSbg\AjaxHandler\GetExportStatus'
+            ]
+        ],
         'ils_driver' => [
             'factories' => [
                 'DbSbg\ILS\Driver\Alma' => 'VuFind\ILS\Driver\DriverWithDateConverterFactory'
@@ -74,7 +81,7 @@ $config = [
 ];
 
 $staticRoutes = [
-    'Search/Export'
+    'Search/Export', 'Search/Export/Status'
 ];
 
 $routeGenerator = new \VuFind\Route\RouteGenerator();

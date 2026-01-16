@@ -1,0 +1,74 @@
+<?php $this->headTitle($this->translate('Export Status')); ?>
+
+<h2><?=$this->transEsc('Export Status')?></h2>
+
+<!-- Progress Container -->
+<div id="exportProgressContainer">
+    <p>Der Export wird erstellt. Bitte warten...</p>
+    
+    <div class="progress">
+      <div id="exportProgressBar" class="progress-bar progress-bar-striped active" role="progressbar" 
+           aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
+        0%
+      </div>
+    </div>
+    
+    <p id="exportStatusText" class="text-info">Starte Export...</p>
+</div>
+
+<!-- Success Container (hidden) -->
+<div id="exportSuccessContainer" style="display:none;" class="text-center">
+    <div class="alert alert-success">
+        Export erfolgreich abgeschlossen!
+    </div>
+    <a id="downloadLink" class="btn btn-primary" href="#" data-lightbox-ignore="true">
+        <i class="fa fa-download"></i> Datei herunterladen
+    </a>
+</div>
+
+<!-- Error Container (hidden) -->
+<div id="exportErrorContainer" style="display:none;" class="text-center">
+    <div class="alert alert-danger" id="exportErrorMessage">
+        Ein Fehler ist aufgetreten.
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    var jobId = '<?=$this->escapeJs($this->jobId)?>';
+
+    var pollInterval = setInterval(function() {
+        $.getJSON(
+            VuFind.path + '/AJAX/JSON?jobId=' + jobId,
+            {
+                method: 'getExportStatus'
+            }
+        ).done(function(response) {
+            var status = response.data.status_file.status;
+            var filename = response.data.status_file.filename;
+            var total = response.data.status_file.total;
+            var count = response.data.status_file.count;
+            var msg = response.data.status_file.msg;
+            var percent = response.data.status_file.percent + '%';
+            if (status === 'initializing') {
+                // Do nothing, just wait for next poll
+                $('#exportStatusText').text('Job wird initialisiert...');
+            } else if (status === 'processing') {
+                // ... existing processing logic ...
+                $('#exportProgressBar').css('width', percent).text(percent);
+                $('#exportStatusText').text(count + ' von ' + total + ' Datensätzen verarbeitet.');
+            } else if (status === 'done') {
+                clearInterval(pollInterval);
+                $('#exportProgressContainer').hide();
+                $('#exportSuccessContainer').show();
+                $('#downloadLink').attr('href', '/localfile/open?filename=' + filename);
+            } else if (status === 'error') {
+                clearInterval(pollInterval);
+                $('#exportProgressContainer').hide();
+                $('#exportErrorContainer').show();
+                $('#exportErrorMessage').text(msg || 'Unbekannter Fehler.');
+            }
+        });
+    }, 300);
+});
+</script>

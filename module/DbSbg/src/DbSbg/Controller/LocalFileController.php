@@ -2,9 +2,9 @@
 /**
  * LocalFile controller
  *
- * PHP version 7
+ * PHP version 8
  *
- * Copyright (C) Michael Birkner 2023.
+ * Copyright (C) Radix Lab - Michael Birkner-Tröger 2026.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2,
@@ -21,7 +21,7 @@
  * 
  * @category VuFind
  * @package  Controller
- * @author   Michael Birkner <birkner_michael@yahoo.de>
+ * @author   Michael Birkner-Tröger <office@radix-lab.at>
  * @license  https://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:controllers Wiki
  */
@@ -32,7 +32,7 @@ namespace DbSbg\Controller;
  *
  * @category VuFind
  * @package  Controller
- * @author   Michael Birkner <birkner_michael@yahoo.de>
+ * @author   Michael Birkner-Tröger <office@radix-lab.at>
  * @license  https://opensource.org/licenses/gpl-2.0.php GNU General Public License
  * @link     https://vufind.org/wiki/development:plugins:controllers Wiki
  */
@@ -50,31 +50,48 @@ class LocalFileController extends \VuFind\Controller\AbstractBase
         $webaccessPath = rtrim($config['LocalFile']['webaccess_path'], '/');
 
         $filename = $this->params()->fromQuery('filename');
-        $fullFilePath = $webaccessPath.'/'.$filename;
+        
+        // Security Check: Prevent directory traversal
+        if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $filename)) {
+            throw new \Exception('Invalid filename');
+        }
+
+        $fullFilePath = $webaccessPath . '/' . $filename;
 
         if (file_exists($fullFilePath)) {
-            $ext = substr($fullFilePath, -3, 3);
+            // Use Laminas Stream Response
+            $response = new \Laminas\Http\Response\Stream();
+            $response->setStream(fopen($fullFilePath, 'r'));
+            $response->setStatusCode(200);
+            $response->setStreamName(basename($fullFilePath));
+            
+            $headers = $response->getHeaders();
+            
+            $ext = strtolower(pathinfo($fullFilePath, PATHINFO_EXTENSION));
+            
             if ($ext == 'csv') {
-                header('Content-Type: text/csv; charset=UTF-16');
-                header('Content-Disposition: attachment; filename="' . basename($fullFilePath) . '"');
+                // Note: UTF-16 is rare for web CSVs. UTF-8 + BOM is usually better for Excel.
+                // If you wrote the file as UTF-8 in the export script, declare it as UTF-8 here.
+                //$headers->addHeaderLine('Content-Type', 'text/csv; charset=utf-8');
+                $headers->addHeaderLine('Content-Type: text/csv; charset=UTF-16');
+                $headers->addHeaderLine('Content-Disposition', 'attachment; filename="' . basename($fullFilePath) . '"');
             } else if ($ext == 'pdf') {
-                header('Content-Type: application/pdf');
+                $headers->addHeaderLine('Content-Type', 'application/pdf');
             } else {
-                header('Content-Type: application/octet-stream');
-                header('Content-Disposition: attachment; filename="' . basename($fullFilePath) . '"');
-                header('Content-Length: ' . filesize($fullFilePath));
+                $headers->addHeaderLine('Content-Type', 'application/octet-stream');
+                $headers->addHeaderLine('Content-Disposition', 'attachment; filename="' . basename($fullFilePath) . '"');
             }
-            
-            header('Content-Description: File Transfer');
-            header('Pragma: public');
-            
-            // Send file for download
-            readfile($fullFilePath);
 
-            // Exit for not appending current page HTML
-            exit();
+            $headers->addHeaderLine('Content-Length', filesize($fullFilePath));
+            $headers->addHeaderLine('Content-Description', 'File Transfer');
+            $headers->addHeaderLine('Pragma', 'public');
+            $headers->addHeaderLine('Cache-Control', 'must-revalidate, post-check=0, pre-check=0');
+            $headers->addHeaderLine('Expires', '0');
+
+            return $response;
         } else {
             return $this->createViewModel(['filename' => $filename]);
         }
     }
+
 }
