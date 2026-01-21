@@ -112,7 +112,7 @@ class ExportCsvCommand extends Command implements TranslatorAwareInterface
         $jobId = $input->getArgument('jobId');
 
         // Status file path
-        $statusFile = '/opt/exports/export_status_' . $jobId . '.json';
+        $statusFile = '/usr/local/vufind/exports/export_status_' . $jobId . '.json';
         
         // Check if params file exists
         if (!file_exists($paramsFile)) {
@@ -131,7 +131,7 @@ class ExportCsvCommand extends Command implements TranslatorAwareInterface
         
         // Setup file with exported data
         $filename = 'export_' . $jobId . '.csv';
-        $filepath = '/opt/exports/' . $filename;
+        $filepath = '/usr/local/vufind/exports/' . $filename;
         $file = fopen($filepath, 'w');
 
         // Define the headings for the CSV
