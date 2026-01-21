@@ -73,7 +73,7 @@ class GetExportStatus extends \VuFind\AjaxHandler\AbstractBase
         $jobId = $queryParams['jobId'] ?? '';
 
         // Define path to status file
-        $statusFile = '/opt/exports/export_status_' . $jobId . '.json';
+        $statusFile = '/usr/local/vufind/exports/export_status_' . $jobId . '.json';
 
         // If file is missing, assume it's still starting up
         if (!file_exists($statusFile)) {

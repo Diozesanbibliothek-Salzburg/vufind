@@ -63,7 +63,7 @@ class SearchController extends \VuFind\Controller\SearchController
         
         if ($this->formWasSubmitted('submitExportSearchResults')) {
             // Define path to debug file
-            $debugFile = '/opt/exports/export_debug.log';
+            $debugFile = '/usr/local/vufind/exports/export_debug.log';
 
             // Get all request params
             $requestRaw = $this->getRequest()->getQuery()->toArray()
@@ -72,8 +72,8 @@ class SearchController extends \VuFind\Controller\SearchController
             $request = $httpUri->getQueryAsArray();
 
             $jobId = uniqid();
-            $paramsFile = "/opt/exports/export_params_{$jobId}.txt";
-            $outputFile = "/opt/exports/vufind_export_{$jobId}.csv";
+            $paramsFile = "/usr/local/vufind/exports/export_params_{$jobId}.txt";
+            $outputFile = "/usr/local/vufind/exports/vufind_export_{$jobId}.csv";
             
             // Save params for the worker
             file_put_contents($paramsFile, serialize($request));
