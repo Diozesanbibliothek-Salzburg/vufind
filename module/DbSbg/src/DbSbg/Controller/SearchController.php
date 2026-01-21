@@ -81,7 +81,7 @@ class SearchController extends \VuFind\Controller\SearchController
             // Launch background process (Fire and forget)
             // "nohup" ensures it keeps running if the web request ends
             // "> /dev/null 2>&1 &" ensures PHP doesn't wait for output
-            $cmd = "VUFIND_HOME=/opt/vufind VUFIND_LOCAL_DIR=/opt/vufind/local "
+            $cmd = "VUFIND_HOME=/usr/local/vufind/vufind VUFIND_LOCAL_DIR=/usr/local/vufind/vufind/local "
                 . "VUFIND_LOCAL_MODULES=\"DbSbg,DbSbgSearch,DbSbgTheme,DbSbgConsole\" "
                 . "nohup nice -n 19 php " . APPLICATION_PATH . "/public/index.php export/export_csv "
                 . escapeshellarg($paramsFile) . " "
