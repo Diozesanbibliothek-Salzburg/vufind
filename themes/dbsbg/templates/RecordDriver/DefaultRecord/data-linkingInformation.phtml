@@ -1,0 +1,23 @@
+<?php if(count($data) > 1): ?>
+<ul>
+  <?php foreach($data as $title): ?>
+    <li>
+      <?php if ($title['acNo'] ?? null): ?>
+        <a href="<?=$this->url('record')?><?=$this->escapeHtmlAttr($title['acNo'])?>#parentchild">
+          <?=$this->escapeHtml($title['title'])?>
+        </a>
+      <?php else: ?>
+        <?=$this->escapeHtml($title['title'])?>
+      <?php endif; ?>
+    </li>
+  <?php endforeach; ?>
+</ul>
+<?php else: ?>
+  <?php if ($data[0]['acNo'] ?? null): ?>
+    <a href="<?=$this->url('record')?><?=$this->escapeHtmlAttr($data[0]['acNo'])?>#parentchild">
+      <?=$this->escapeHtml($data[0]['title'])?>
+    </a>
+    <?php else: ?>
+      <?=$this->escapeHtml($data[0]['title'])?>
+    <?php endif; ?>
+<?php endif; ?>

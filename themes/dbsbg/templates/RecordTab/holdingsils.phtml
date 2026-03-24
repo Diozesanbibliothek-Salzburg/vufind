@@ -222,8 +222,14 @@
 
 <?php // DbSbg: No holdings available?>
 <div class='holdings noHoldings'>
-<?php // DbSbg: Check if there are no holdings (or URLs - uncomment below) ?>
-  <?php if (empty($holdings['holdings']) /*&& empty($urls)*/ && empty($holdings['summarizedHoldings'])): ?>
+  <?php // DbSbg: Check if there are no holdings (or URLs - uncomment below) ?>
+  <?php if ($this->tab->hasChilds()): ?>
+    <h4><?=$this->transEsc('IntegratedInChildHolding')?></h4>
+    <a href="<?=$this->recordLinker()->getTabUrl($this->driver, 'ParentChild')?>">
+      <?=$this->transEsc('VolumeTitles')?>
+    </a>
+    <br />
+  <?php elseif (empty($holdings['holdings']) /*&& empty($urls)*/ && empty($holdings['summarizedHoldings'])): ?>
     <h3><?=$this->transEsc("holdingNote")?>:</h3>
     <div class="padding-online-content">
         <?php // DbSbg: Show information that there are no holdings ?>
