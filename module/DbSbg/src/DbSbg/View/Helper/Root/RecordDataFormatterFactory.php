@@ -147,6 +147,27 @@ class RecordDataFormatterFactory
     {
         $spec = new \VuFind\View\Helper\Root\RecordDataFormatter\SpecBuilder();
 
+        // RXL: Adding parent titles from fields 830 and 773
+        $spec->setTemplateLine(
+            'parent_titles_830',
+            'get830ParentTitles',
+            'data-linkingInformation.phtml'
+        );
+        $spec->setTemplateLine(
+            'parent_titles_773',
+            'get773ParentTitles',
+            'data-linkingInformation.phtml',
+            [
+                'dataMethodParams' => ['0']
+            ]
+        );
+        // RXL: Adding other relationships from field 787
+        $spec->setTemplateLine(
+            'Other relationship',
+            'get787Link',
+            'data-linkingInformation.phtml'
+        );
+
         $spec->setTemplateLine(
             'Published in', 'getContainerTitle', 'data-containerTitle.phtml'
         );

@@ -1,0 +1,10 @@
+<h3><?=$this->transEsc('related_child_titles')?></h3>
+<ul>
+    <?php foreach ($this->tab->getChilds() as $child): ?>
+        <li>
+            <a href="<?=$this->url('record')?><?=$this->escapeHtmlAttr($child['id'])?>">
+                <?=$this->escapeHtml($child['title']) ?? $this->transEsc('No title')?>
+            </a>
+        </li>
+    <?php endforeach; ?>
+</ul>
