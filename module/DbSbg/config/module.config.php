@@ -71,6 +71,22 @@ $config = [
                 ]
             ]
         ],
+        'recordtab' => [
+            'factories' => [
+                'DbSbg\RecordTab\HoldingsILS' => 'VuFind\RecordTab\HoldingsILSFactory',
+                'DbSbg\RecordTab\ParentChild' => 'Laminas\ServiceManager\Factory\InvokableFactory'
+                ],
+                'aliases' => [
+                    'holdingsils' => 'DbSbg\RecordTab\HoldingsILS',
+                    'parentchild' => 'DbSbg\RecordTab\ParentChild',
+                    'VuFind\RecordTab\HoldingsILS' => 'DbSbg\RecordTab\HoldingsILS',
+                ],
+        ],
+        'search_backend' => [
+            'factories' => [
+                'Solr' => 'DbSbg\Search\Factory\SolrDefaultBackendFactory'
+            ]
+        ],
         'search_backend' => [
             'factories' => [
                 'Solr' => 'DbSbg\Search\Factory\SolrDefaultBackendFactory'

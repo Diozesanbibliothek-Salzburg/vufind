@@ -307,7 +307,7 @@ AllFields:
     - subjectChainTopic_txt_mv^450
     - autSubjects_txt_mv^450
     - autGeographics_txt_mv^400
-    - id
+    - id_txt
     - acNo_txt
     - holCallNo_txt_mv
     - itmBarcode_txt_mv
