@@ -23,6 +23,10 @@
     }
     // Set page title.
     $this->headTitle($this->translate('Holdings') . ': ' . $this->driver->getBreadcrumb());
+
+    // RXL: Check if there are parent or child titles
+    $hasChilds = $this->tab->hasChilds();
+    $parents = $this->tab->hasOrGetParents();
 ?>
 
 <?=$this->context($this)->renderInContext('librarycards/selectcard.phtml', ['user' => $this->auth()->isLoggedIn()]); ?>
@@ -220,16 +224,67 @@
 <?php endif; ?>
 
 
-<?php // DbSbg: No holdings available?>
+<?php // RXL: No default holdings available?>
 <div class='holdings noHoldings'>
-  <?php // DbSbg: Check if there are no holdings (or URLs - uncomment below) ?>
-  <?php if ($this->tab->hasChilds()): ?>
-    <h4><?=$this->transEsc('IntegratedInChildHolding')?></h4>
-    <a href="<?=$this->recordLinker()->getTabUrl($this->driver, 'ParentChild')?>">
-      <?=$this->transEsc('VolumeTitles')?>
-    </a>
+
+  <?php // RXL: Check if there are childs available ?>
+  <?php if ($hasChilds): ?>
+    <h4><?=$this->transEsc('IntegratedInChildHoldingHeading')?></h4>
+    <div>
+      <?=$this->transEsc('IntegratedInChildHoldingText')?>
+      <a href="<?=$this->recordLinker()->getTabUrl($this->driver, 'ParentChild')?>">
+        <?=$this->transEsc('VolumeTitles')?>
+      </a>
+    </div>
     <br />
-  <?php elseif (empty($holdings['holdings']) /*&& empty($urls)*/ && empty($holdings['summarizedHoldings'])): ?>
+  <?php endif; ?>
+
+  <?php // RXL: Check if there are parents available ?>
+  <?php if ($parents): ?>
+    <h4><?=$this->transEsc('IntegratedInParentHoldingHeading')?></h4>
+    <div><?=$this->transEsc('IntegratedInParentHoldingText')?></div>
+    <br />
+    <ul>
+      <?php foreach ($parents as $parent): ?>
+          <li>
+            <a href="<?=$this->url('record')?><?=$this->escapeHtmlAttr($parent['id'])?>">
+              <?=$this->escapeHtml($parent['title'] ?? $this->transEsc('Title not available'))?>
+            </a>
+            <?php if (!empty($parent['hols'])): ?>
+              <?php if (count($parent['hols']) > 1): ?>
+                <ul>
+                  <?php foreach ($parent['hols'] as $hol): ?>
+                    <li>
+                      <?=$this->transEsc($hol['libraryName'])?>
+                      <?php if (!empty($hol['locationName'])): ?>
+                        (<?=$this->transEsc($hol['locationName'])?>)
+                      <?php endif; ?>
+                      <?php if (!empty($hol['callnumber'])): ?>
+                        - <?=$this->transEsc('Call Number')?>: <?=$this->escapeHtml($hol['callnumber'])?>
+                      <?php endif; ?>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php elseif (count($parent['hols']) === 1): ?>
+                <div>
+                  <?php $hol = $parent['hols'][0]; ?>
+                  <?=$this->transEsc($hol['libraryName'])?>
+                  <?php if (!empty($hol['locationName'])): ?>
+                    (<?=$this->transEsc($hol['locationName'])?>)
+                  <?php endif; ?>
+                  <?php if (!empty($hol['callnumber'])): ?>
+                    - <?=$this->transEsc('Call Number')?>: <?=$this->escapeHtml($hol['callnumber'])?>
+                  <?php endif; ?>
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
+          </li>
+      <?php endforeach; ?>
+    </ul>
+  <?php endif; ?>
+
+  <?php // RXL: Check if nothing is available ?>
+  <?php if (empty($holdings['holdings']) /*&& empty($urls)*/ && empty($holdings['summarizedHoldings']) && !$hasChilds && !$parents): ?>
     <h3><?=$this->transEsc("holdingNote")?>:</h3>
     <div class="padding-online-content">
         <?php // DbSbg: Show information that there are no holdings ?>
