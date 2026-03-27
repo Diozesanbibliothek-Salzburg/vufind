@@ -517,6 +517,151 @@ class SolrMarc extends \VuFind\RecordDriver\SolrMarc
     }
 
     /**
+     * Get all parent IDs from fields 773w and 830w
+     *
+     * @return array
+     */
+    public function getParentIds() {
+        /**
+         * Get a Marc reader
+         * @var \VuFind\Marc\MarcReader
+         */
+        $marc = $this->getMarcReader();
+
+        // Get fields 773 and 830, and from there the subfields "w" that contain
+        // the IDs
+        $fs773 = $marc->getFields('773', ['w']);
+        $fs830 = $marc->getFields('830', ['w']);
+
+        // Merge the fields for simpler processing
+        $parentIdFields = array_merge($fs773, $fs830);
+
+        // Get unique IDs out of parent ID fields
+        $parentIds = [];
+        foreach ($parentIdFields as $parentIdField) {
+            foreach (($parentIdField['subfields'] ?? []) as $subfield) {
+                if (($subfield['code'] ?? false) == 'w') {
+                    $parentIds[] = $subfield['data'];
+                }
+            }
+        }
+        $parentIds = array_unique($parentIds);
+
+        // Create clean IDs (removing prefixes like "(AT-OBV)")
+        $parentIdsClean = [];
+        foreach ($parentIds as $parentId) {
+            $parentIdClean = preg_replace('/\(.*?\)/', '', $parentId);
+            $parentIdsClean[] = trim($parentIdClean);
+        }
+
+        // Merge all IDs into an array and remove duplicates
+        $allparentIds = array_unique(array_merge($parentIds, $parentIdsClean));
+
+        return $allparentIds;
+    }
+
+    /**
+     * Check if there are parent records. If yes, return data from the parent
+     * record. If not, return false.
+     *
+     * @return false|array Parent data if parent records exists, false otherwise
+     */
+    public function hasOrGetParents() {
+        $parentIds = $this->getParentIds();
+
+        if (empty($parentIds)) {
+            return false;
+        }
+
+        // Create a safe query string with escaped quotes
+        $parentIdsSafe = [];
+        foreach ($parentIds as $parentId) {
+            $parentIdsSafe[] = '"'.addcslashes($parentId, '"').'"';
+        }
+
+        // Create the OR query string for the search request to Solr
+        $parentIdsQuery = implode(' OR ', $parentIdsSafe);
+        // Create a Solr query for getting the child records
+        $query = new \VuFindSearch\Query\Query(
+            'id:(' . $parentIdsQuery . ') '
+            .'|| acNo_txt:(' . $parentIdsQuery . ') '
+            .'|| ctrlnum:(' . $parentIdsQuery . ')'
+        );
+
+        // Disable highlighting for efficiency. Return only fields that we
+        // need. Sort newest to oldest (except pages [see "orderNo_str"]).
+        $params = new \VuFindSearch\ParamBag([
+            'hl' => ['false'],
+            'fl' => ['id', 'acNo_txt', 'ctrlnum', 'record_format',
+                'fullrecord'],
+        ]);
+
+        // Create the query command
+        $command = new \VuFindSearch\Command\SearchCommand(
+            $this->sourceIdentifier, $query, 0, 10, $params);
+
+        $solrResult = $this->searchService->invoke($command)->getResult();
+        $records = $solrResult->getRecords();
+
+        // Check if we have some parents
+        if (empty($records)) {
+            return false;
+        }
+
+        // Collect parent data
+        $parents = [];
+        foreach ($records as $record) {
+            $fullRecord = $record->fields['fullrecord'] ?? null;
+            if (!$fullRecord) {
+                continue;
+            }
+            $marc = new \VuFind\Marc\MarcReader($fullRecord);
+            $id = $marc->getField('001') ?: null;
+            if (!$id) {
+                continue;
+            }
+            $titleRaw = $marc->getField('245', ['a', 'b']) ?: null;
+            $mainTitle = $marc->getSubfield($titleRaw, 'a');
+            $subTitle = $marc->getSubfield($titleRaw, 'b');
+            $title = (!empty($mainTitle) && !empty($subTitle))
+                ? $this->stripNonSortingChars($mainTitle) . ' : '
+                    . $this->stripNonSortingChars($subTitle)
+                : (!empty($mainTitle)
+                    ? $this->stripNonSortingChars($mainTitle) : null);
+            $hols = $marc->getFields('HOL', ['b', 'c', 'h']) ?: [];
+            $holData = [];
+            foreach ($hols as $hol) {
+                $libraryCode = $marc->getSubfield($hol, 'b');
+                $locationCode = $marc->getSubfield($hol, 'c');
+                $locationData = $this->ils->getLocationData($libraryCode,
+                    $locationCode);
+                $libraryName = $locationData['library_name'] ?? null;
+                $locationName = (!empty($locationData['external_name']))
+                    ? $locationData['external_name']
+                    : (!empty($locationData['name'])
+                        ? $locationData['name']
+                        : null);
+                $callnumber = $marc->getSubfield($hol, 'h');
+                $callnumber = (!empty($callnumber)) ? $callnumber : null;
+                $holData[] = [
+                    'libraryCode' => $libraryCode,
+                    'libraryName' => $libraryName,
+                    'locationCode' => $locationCode,
+                    'locationName' => $locationName,
+                    'callnumber' => $callnumber
+                ];
+            }
+            $parents[] = [
+                'id' => $id,
+                'title' => $title,
+                'hols' => $holData
+            ];
+        }
+
+        return array_filter($parents);
+    }
+
+    /**
      * RXL: Remove non-sorting characters "<<" and ">>" from the provided data.
      * The data can be a string or an array.
      *

@@ -47,4 +47,13 @@ class HoldingsILS extends \VuFind\RecordTab\HoldingsILS {
         return $this->getRecordDriver()->tryMethod('hasChilds');
     }
 
+    /**
+     * RXL: Check if this record has parent records
+     *
+     * @return bool
+     */
+    public function hasOrGetParents() {
+        return $this->getRecordDriver()->tryMethod('hasOrGetParents');
+    }
+
 }
