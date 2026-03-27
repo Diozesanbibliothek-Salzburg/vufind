@@ -229,7 +229,7 @@
 
   <?php // RXL: Check if there are childs available ?>
   <?php if ($hasChilds): ?>
-    <h4><?=$this->transEsc('IntegratedInChildHoldingHeading')?></h4>
+    <h3><?=$this->transEsc('IntegratedInChildHoldingHeading')?></h3>
     <div>
       <?=$this->transEsc('IntegratedInChildHoldingText')?>
       <a href="<?=$this->recordLinker()->getTabUrl($this->driver, 'ParentChild')?>">
@@ -241,7 +241,7 @@
 
   <?php // RXL: Check if there are parents available ?>
   <?php if ($parents): ?>
-    <h4><?=$this->transEsc('IntegratedInParentHoldingHeading')?></h4>
+    <h3><?=$this->transEsc('IntegratedInParentHoldingHeading')?></h3>
     <div><?=$this->transEsc('IntegratedInParentHoldingText')?></div>
     <br />
     <ul>
